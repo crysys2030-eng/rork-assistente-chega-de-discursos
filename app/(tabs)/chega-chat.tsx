@@ -14,6 +14,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { Send, Trash2, Shield, Sparkles } from "lucide-react-native";
+import { useRorkAgent } from "@rork/toolkit-sdk";
 
 interface ChatMessagePartText {
   type: "text";
