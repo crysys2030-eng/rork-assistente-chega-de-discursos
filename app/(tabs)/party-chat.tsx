@@ -1291,7 +1291,7 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 20,
     fontWeight: "700" as const,
-    color: "#000000",
+    color: "#FFFFFF",
     marginTop: 16,
     marginBottom: 8,
   },
