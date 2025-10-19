@@ -322,11 +322,12 @@ function TasksScreen() {
   return (
     <View style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
-      <LinearGradient
-        colors={["#1a1a2e", "#16213e"]}
-        style={[styles.header, { paddingTop: insets.top + 20 }]}
-      >
-        <View style={styles.headerContent}>
+      <View style={[styles.headerWrapper, { paddingTop: insets.top }]}>
+        <LinearGradient
+          colors={["#1a1a2e", "#16213e"]}
+          style={styles.header}
+        >
+          <View style={styles.headerContent}>
           <View>
             <Text style={styles.headerTitle}>🎯 Tarefas Chega</Text>
             <Text style={styles.headerSubtitle}>Geradas com IA</Text>
@@ -347,8 +348,9 @@ function TasksScreen() {
               )}
             </TouchableOpacity>
           </LinearGradient>
-        </View>
-      </LinearGradient>
+          </View>
+        </LinearGradient>
+      </View>
 
       <ScrollView style={styles.scrollView}>
         {taskLists.length === 0 ? (
@@ -603,8 +605,12 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#0f0f23",
   },
+  headerWrapper: {
+    backgroundColor: "#1a1a2e",
+  },
   header: {
     paddingHorizontal: 20,
+    paddingTop: 20,
     paddingBottom: 20,
   },
   headerContent: {
