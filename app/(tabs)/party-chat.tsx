@@ -178,8 +178,10 @@ export default function PartyChatScreen() {
   };
 
   const shareToWhatsApp = async (room: ChatRoom) => {
-    const inviteLink = `chega://room/${room.id}`;
-    const message = `🔐 *Convite para Sala do Partido Chega*\n\n📌 *Sala:* ${room.name}\n🔑 *Código:* ${room.encryptionKey}\n\nEntre na aplicação e use o código acima para aceder.\n\n${inviteLink}`;
+    const inviteLink = `chega://room/${room.id}?key=${encodeURIComponent(room.encryptionKey)}&name=${encodeURIComponent(room.name)}`;
+    const webLink = `https://chega.app/join/${room.id}?key=${encodeURIComponent(room.encryptionKey)}`;
+    
+    const message = `🔐 *Convite para Sala do Partido Chega*\n\n📌 *Sala:* ${room.name}\n🔑 *Código:* ${room.encryptionKey}\n\n🔗 *Link de Acesso:*\n${webLink}\n\nClique no link ou abra a aplicação e use o código acima para aceder.\n\n*Link Direto:* ${inviteLink}`;
 
     const whatsappUrl = `whatsapp://send?text=${encodeURIComponent(message)}`;
 
@@ -196,8 +198,15 @@ export default function PartyChatScreen() {
     } catch (error) {
       Alert.alert(
         "Partilhar Convite",
-        `Sala: ${room.name}\nCódigo: ${room.encryptionKey}`,
+        `Sala: ${room.name}\nCódigo: ${room.encryptionKey}\n\nLink: ${webLink}`,
         [
+          {
+            text: "Copiar Link",
+            onPress: async () => {
+              await Clipboard.setStringAsync(webLink);
+              Alert.alert("Copiado", "Link copiado para a área de transferência");
+            },
+          },
           {
             text: "Copiar Código",
             onPress: async () => {
