@@ -405,11 +405,18 @@ A minuta deve ser:
           </View>
         ) : (
           <View style={styles.minutesList}>
-            {minutes
+            {[...minutes]
               .sort((a, b) => {
-                const timeA = a.createdAt instanceof Date ? a.createdAt.getTime() : new Date(a.createdAt).getTime();
-                const timeB = b.createdAt instanceof Date ? b.createdAt.getTime() : new Date(b.createdAt).getTime();
-                return timeB - timeA;
+                try {
+                  const dateA = a.createdAt instanceof Date ? a.createdAt : new Date(a.createdAt);
+                  const dateB = b.createdAt instanceof Date ? b.createdAt : new Date(b.createdAt);
+                  const timeA = dateA.getTime();
+                  const timeB = dateB.getTime();
+                  return timeB - timeA;
+                } catch (error) {
+                  console.error('Error sorting minutes:', error);
+                  return 0;
+                }
               })
               .map((minute) => (
                 <LinearGradient

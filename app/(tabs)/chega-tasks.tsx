@@ -362,8 +362,17 @@ function TasksScreen() {
           </View>
         ) : (
           <View style={styles.taskListsContainer}>
-            {taskLists
-              .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+            {[...taskLists]
+              .sort((a, b) => {
+                try {
+                  const dateA = a.createdAt instanceof Date ? a.createdAt : new Date(a.createdAt);
+                  const dateB = b.createdAt instanceof Date ? b.createdAt : new Date(b.createdAt);
+                  return dateB.getTime() - dateA.getTime();
+                } catch (error) {
+                  console.error('Error sorting tasks:', error);
+                  return 0;
+                }
+              })
               .map((taskList) => {
                 const progress = getTaskListProgress(taskList);
                 const isExpanded = expandedTaskList === taskList.id;

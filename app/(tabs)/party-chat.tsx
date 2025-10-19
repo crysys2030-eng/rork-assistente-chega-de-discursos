@@ -297,7 +297,7 @@ export default function PartyChatScreen() {
         parsedData = JSON.parse(data);
       } catch {
         if (data.includes('party-chat?')) {
-          const url = new URL(data);
+          const url = new URL(data.replace('exp://', 'https://'));
           const roomId = url.searchParams.get('roomId');
           const key = url.searchParams.get('key');
           const suggestedUsername = url.searchParams.get('username') || 'Novo Membro';
