@@ -16,6 +16,8 @@ import {
   Check,
   ChevronDown,
   ChevronUp,
+  FileDown,
+  ListChecks,
 } from "lucide-react-native";
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
@@ -29,17 +31,26 @@ import {
   Platform,
   Modal,
   Alert,
+  Share,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Clipboard from "expo-clipboard";
 import { z } from "zod";
+import * as FileSystem from "expo-file-system";
 
 interface TaskNote {
   task: string;
   priority: "high" | "medium" | "low";
   assignedTo?: string;
   deadline?: string;
+}
+
+interface TaskItem {
+  id: string;
+  title: string;
+  completed: boolean;
+  createdAt: Date;
 }
 
 interface Minute {
@@ -50,6 +61,7 @@ interface Minute {
   topics: string[];
   summary: string;
   tasks: TaskNote[];
+  taskList: TaskItem[];
   createdAt: Date;
 }
 
@@ -66,6 +78,7 @@ const [MinutesContext, useMinutes] = createContextHook(() => {
       return parsed.map((m: Minute) => ({
         ...m,
         createdAt: new Date(m.createdAt),
+        taskList: m.taskList || [],
       }));
     },
   });
@@ -94,6 +107,12 @@ const [MinutesContext, useMinutes] = createContextHook(() => {
     syncMinutes(updated);
   }, [minutes, syncMinutes]);
 
+  const updateMinute = useCallback((id: string, updatedMinute: Minute) => {
+    const updated = minutes.map((m) => (m.id === id ? updatedMinute : m));
+    setMinutes(updated);
+    syncMinutes(updated);
+  }, [minutes, syncMinutes]);
+
   const removeMinute = useCallback((id: string) => {
     const updated = minutes.filter((m) => m.id !== id);
     setMinutes(updated);
@@ -101,17 +120,21 @@ const [MinutesContext, useMinutes] = createContextHook(() => {
   }, [minutes, syncMinutes]);
 
   return useMemo(
-    () => ({ minutes, addMinute, removeMinute, isLoading: minutesQuery.isLoading }),
-    [minutes, addMinute, removeMinute, minutesQuery.isLoading]
+    () => ({ minutes, addMinute, updateMinute, removeMinute, isLoading: minutesQuery.isLoading }),
+    [minutes, addMinute, updateMinute, removeMinute, minutesQuery.isLoading]
   );
 });
 
 function MinutesScreen() {
   const insets = useSafeAreaInsets();
-  const { minutes, addMinute, removeMinute } = useMinutes();
+  const { minutes, addMinute, updateMinute, removeMinute } = useMinutes();
   const [showGenerateModal, setShowGenerateModal] = useState(false);
   const [expandedMinute, setExpandedMinute] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [showTaskListModal, setShowTaskListModal] = useState(false);
+  const [selectedMinuteForTasks, setSelectedMinuteForTasks] = useState<Minute | null>(null);
+  const [newTaskTitle, setNewTaskTitle] = useState("");
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
 
   const [meetingNotes, setMeetingNotes] = useState("");
   const [meetingTitle, setMeetingTitle] = useState("");
@@ -186,6 +209,7 @@ Contexto: Reunião do partido político Chega em Portugal.`;
         topics: result.topics,
         summary: result.summary,
         tasks: result.tasks,
+        taskList: [],
         createdAt: new Date(),
       };
 
@@ -234,7 +258,204 @@ Contexto: Reunião do partido político Chega em Portugal.`;
           }${t.deadline ? `\n   Prazo: ${t.deadline}` : ""}`
       )
       .join("\n\n")}`;
+    if (minute.taskList && minute.taskList.length > 0) {
+      text += `\n\nLISTA DE TAREFAS REALIZADAS:\n${minute.taskList
+        .map((task, i) => `${i + 1}. [${task.completed ? "✓" : " "}] ${task.title}`)
+        .join("\n")}`;
+    }
     return text;
+  };
+
+  const generatePDF = async (minute: Minute) => {
+    if (Platform.OS === 'web') {
+      Alert.alert("Info", "Geração de PDF não disponível na web. Use a opção copiar e cole num editor de texto.");
+      return;
+    }
+
+    setIsGeneratingPDF(true);
+    try {
+      const htmlContent = `
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <meta charset="UTF-8">
+            <style>
+              body {
+                font-family: Arial, sans-serif;
+                padding: 40px;
+                color: #333;
+              }
+              h1 {
+                color: #00D4FF;
+                border-bottom: 3px solid #00D4FF;
+                padding-bottom: 10px;
+              }
+              h2 {
+                color: #0099CC;
+                margin-top: 30px;
+                margin-bottom: 15px;
+              }
+              .info {
+                background: #f5f5f5;
+                padding: 15px;
+                border-radius: 8px;
+                margin: 20px 0;
+              }
+              .info p {
+                margin: 5px 0;
+              }
+              ul {
+                line-height: 1.8;
+              }
+              .task {
+                background: #e8f8ff;
+                padding: 15px;
+                margin: 10px 0;
+                border-left: 4px solid #00D4FF;
+                border-radius: 4px;
+              }
+              .priority-high { border-left-color: #FF3B30; }
+              .priority-medium { border-left-color: #FF9500; }
+              .priority-low { border-left-color: #34C759; }
+              .task-meta {
+                font-size: 0.9em;
+                color: #666;
+                margin-top: 5px;
+              }
+              .task-list-item {
+                padding: 8px;
+                margin: 5px 0;
+                background: #f9f9f9;
+                border-radius: 4px;
+              }
+              .completed {
+                text-decoration: line-through;
+                color: #999;
+              }
+            </style>
+          </head>
+          <body>
+            <h1>MINUTA DE REUNIÃO</h1>
+            <div class="info">
+              <p><strong>Título:</strong> ${minute.title}</p>
+              <p><strong>Data:</strong> ${minute.date}</p>
+            </div>
+            
+            <h2>👥 Participantes</h2>
+            <ul>
+              ${minute.attendees.map((a) => `<li>${a}</li>`).join("")}
+            </ul>
+            
+            <h2>📋 Tópicos Discutidos</h2>
+            <ul>
+              ${minute.topics.map((t) => `<li>${t}</li>`).join("")}
+            </ul>
+            
+            <h2>📄 Resumo</h2>
+            <p>${minute.summary}</p>
+            
+            <h2>✅ Tarefas e Ações</h2>
+            ${minute.tasks
+              .map(
+                (task) => `
+              <div class="task priority-${task.priority}">
+                <strong>${task.task}</strong>
+                <div class="task-meta">
+                  <span>Prioridade: ${task.priority === "high" ? "ALTA" : task.priority === "medium" ? "MÉDIA" : "BAIXA"}</span>
+                  ${task.assignedTo ? `<br>Responsável: ${task.assignedTo}` : ""}
+                  ${task.deadline ? `<br>Prazo: ${task.deadline}` : ""}
+                </div>
+              </div>
+            `
+              )
+              .join("")}
+            
+            ${minute.taskList && minute.taskList.length > 0 ? `
+              <h2>📝 Lista de Tarefas Realizadas</h2>
+              ${minute.taskList
+                .map(
+                  (task) => `
+                <div class="task-list-item ${task.completed ? "completed" : ""}">
+                  ${task.completed ? "✓" : "○"} ${task.title}
+                </div>
+              `
+                )
+                .join("")}
+            ` : ""}
+          </body>
+        </html>
+      `;
+
+      const fileName = `minuta_${minute.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_${Date.now()}.pdf`;
+      const filePath = `${FileSystem.documentDirectory}${fileName}`;
+
+      await FileSystem.writeAsStringAsync(filePath, htmlContent, {
+        encoding: FileSystem.EncodingType.UTF8,
+      });
+
+      await Share.share({
+        url: filePath,
+        message: `Minuta: ${minute.title}`,
+      });
+
+      Alert.alert("Sucesso", "PDF gerado e pronto para partilhar!");
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      Alert.alert("Erro", "Não foi possível gerar o PDF. Por favor, copie o texto.");
+    } finally {
+      setIsGeneratingPDF(false);
+    }
+  };
+
+  const openTaskList = (minute: Minute) => {
+    setSelectedMinuteForTasks(minute);
+    setShowTaskListModal(true);
+  };
+
+  const addTaskToList = () => {
+    if (!selectedMinuteForTasks || !newTaskTitle.trim()) return;
+
+    const newTask: TaskItem = {
+      id: Date.now().toString(),
+      title: newTaskTitle.trim(),
+      completed: false,
+      createdAt: new Date(),
+    };
+
+    const updatedMinute: Minute = {
+      ...selectedMinuteForTasks,
+      taskList: [...(selectedMinuteForTasks.taskList || []), newTask],
+    };
+
+    updateMinute(selectedMinuteForTasks.id, updatedMinute);
+    setSelectedMinuteForTasks(updatedMinute);
+    setNewTaskTitle("");
+  };
+
+  const toggleTaskCompletion = (taskId: string) => {
+    if (!selectedMinuteForTasks) return;
+
+    const updatedMinute: Minute = {
+      ...selectedMinuteForTasks,
+      taskList: selectedMinuteForTasks.taskList.map((task) =>
+        task.id === taskId ? { ...task, completed: !task.completed } : task
+      ),
+    };
+
+    updateMinute(selectedMinuteForTasks.id, updatedMinute);
+    setSelectedMinuteForTasks(updatedMinute);
+  };
+
+  const deleteTaskFromList = (taskId: string) => {
+    if (!selectedMinuteForTasks) return;
+
+    const updatedMinute: Minute = {
+      ...selectedMinuteForTasks,
+      taskList: selectedMinuteForTasks.taskList.filter((task) => task.id !== taskId),
+    };
+
+    updateMinute(selectedMinuteForTasks.id, updatedMinute);
+    setSelectedMinuteForTasks(updatedMinute);
   };
 
   return (
@@ -392,6 +613,27 @@ Contexto: Reunião do partido político Chega em Portugal.`;
                       <View style={styles.minuteActions}>
                         <TouchableOpacity
                           style={styles.actionButton}
+                          onPress={() => openTaskList(minute)}
+                        >
+                          <ListChecks size={18} color="#00D4FF" />
+                          <Text style={styles.actionButtonText}>
+                            Tarefas ({minute.taskList?.length || 0})
+                          </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={styles.actionButton}
+                          onPress={() => generatePDF(minute)}
+                          disabled={isGeneratingPDF}
+                        >
+                          {isGeneratingPDF ? (
+                            <Loader2 size={18} color="#00D4FF" />
+                          ) : (
+                            <FileDown size={18} color="#00D4FF" />
+                          )}
+                          <Text style={styles.actionButtonText}>PDF</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={styles.actionButton}
                           onPress={() =>
                             handleCopy(formatMinuteText(minute), minute.id)
                           }
@@ -500,6 +742,99 @@ Contexto: Reunião do partido político Chega em Portugal.`;
                   </TouchableOpacity>
                 </LinearGradient>
               </ScrollView>
+            </View>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={showTaskListModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowTaskListModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <KeyboardAvoidingView
+            style={styles.modalKeyboard}
+            behavior={Platform.OS === "ios" ? "padding" : undefined}
+          >
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Lista de Tarefas</Text>
+                <TouchableOpacity
+                  onPress={() => {
+                    setShowTaskListModal(false);
+                    setSelectedMinuteForTasks(null);
+                    setNewTaskTitle("");
+                  }}
+                >
+                  <Text style={styles.modalClose}>✕</Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.taskListContainer}>
+                <View style={styles.addTaskSection}>
+                  <TextInput
+                    style={styles.taskInput}
+                    value={newTaskTitle}
+                    onChangeText={setNewTaskTitle}
+                    placeholder="Adicionar nova tarefa..."
+                    placeholderTextColor="#8E8E93"
+                    onSubmitEditing={addTaskToList}
+                  />
+                  <TouchableOpacity
+                    style={styles.addTaskButton}
+                    onPress={addTaskToList}
+                  >
+                    <Plus size={20} color="#00D4FF" />
+                  </TouchableOpacity>
+                </View>
+
+                <ScrollView style={styles.taskListScroll}>
+                  {selectedMinuteForTasks?.taskList && selectedMinuteForTasks.taskList.length > 0 ? (
+                    selectedMinuteForTasks.taskList.map((task) => (
+                      <View key={task.id} style={styles.taskListItem}>
+                        <TouchableOpacity
+                          style={styles.taskCheckbox}
+                          onPress={() => toggleTaskCompletion(task.id)}
+                        >
+                          <View
+                            style={[
+                              styles.checkbox,
+                              task.completed && styles.checkboxChecked,
+                            ]}
+                          >
+                            {task.completed && (
+                              <Check size={16} color="#FFFFFF" />
+                            )}
+                          </View>
+                        </TouchableOpacity>
+                        <Text
+                          style={[
+                            styles.taskListText,
+                            task.completed && styles.taskListTextCompleted,
+                          ]}
+                        >
+                          {task.title}
+                        </Text>
+                        <TouchableOpacity
+                          onPress={() => deleteTaskFromList(task.id)}
+                          style={styles.deleteTaskButton}
+                        >
+                          <Trash2 size={16} color="#FF3B30" />
+                        </TouchableOpacity>
+                      </View>
+                    ))
+                  ) : (
+                    <View style={styles.emptyTaskList}>
+                      <ListChecks size={48} color="#C7C7CC" />
+                      <Text style={styles.emptyTaskText}>
+                        Nenhuma tarefa adicionada
+                      </Text>
+                    </View>
+                  )}
+                </ScrollView>
+              </View>
             </View>
           </KeyboardAvoidingView>
         </View>
@@ -700,16 +1035,17 @@ const styles = StyleSheet.create({
   },
   minuteActions: {
     flexDirection: "row",
-    gap: 12,
+    flexWrap: "wrap",
+    gap: 8,
     marginTop: 8,
   },
   actionButton: {
-    flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "rgba(0, 212, 255, 0.2)",
-    paddingVertical: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
     borderRadius: 12,
     gap: 6,
   },
@@ -801,5 +1137,82 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 17,
     fontWeight: "700" as const,
+  },
+  taskListContainer: {
+    flex: 1,
+    padding: 20,
+  },
+  addTaskSection: {
+    flexDirection: "row",
+    gap: 12,
+    marginBottom: 20,
+  },
+  taskInput: {
+    flex: 1,
+    backgroundColor: "#F5F5F7",
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 16,
+    color: "#000000",
+    borderWidth: 1,
+    borderColor: "#E5E5EA",
+  },
+  addTaskButton: {
+    width: 50,
+    height: 50,
+    backgroundColor: "rgba(0, 212, 255, 0.2)",
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  taskListScroll: {
+    flex: 1,
+  },
+  taskListItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F5F5F7",
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 8,
+    gap: 12,
+  },
+  taskCheckbox: {
+    marginRight: 8,
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: "#00D4FF",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  checkboxChecked: {
+    backgroundColor: "#00D4FF",
+  },
+  taskListText: {
+    flex: 1,
+    fontSize: 16,
+    color: "#000000",
+  },
+  taskListTextCompleted: {
+    textDecorationLine: "line-through",
+    color: "#8E8E93",
+  },
+  deleteTaskButton: {
+    padding: 8,
+  },
+  emptyTaskList: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingTop: 80,
+  },
+  emptyTaskText: {
+    fontSize: 16,
+    color: "#8E8E93",
+    marginTop: 16,
   },
 });

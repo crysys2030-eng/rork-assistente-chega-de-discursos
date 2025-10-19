@@ -22,7 +22,12 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "app.rork.assistente_chega_de_discursos"
+      "package": "app.rork.assistente_chega_de_discursos",
+      "permissions": [
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "INTERNET"
+      ]
     },
     "web": {
       "favicon": "./assets/images/favicon.png"
