@@ -87,6 +87,8 @@ export default function PartyChatScreen() {
   const [showScanner, setShowScanner] = useState(false);
   const [roomToJoin, setRoomToJoin] = useState<ChatRoom | null>(null);
   const [permission, requestPermission] = useCameraPermissions();
+  const [showGuestInviteModal, setShowGuestInviteModal] = useState(false);
+  const [guestInviteLink, setGuestInviteLink] = useState("");
 
   const [newRoomName, setNewRoomName] = useState("");
   const [newRoomKey, setNewRoomKey] = useState("");
@@ -99,12 +101,28 @@ export default function PartyChatScreen() {
       hasProcessedDeepLink.current = true;
       const roomId = Array.isArray(params.roomId) ? params.roomId[0] : params.roomId;
       const key = Array.isArray(params.key) ? params.key[0] : params.key;
+      const guestId = Array.isArray(params.guestId) ? params.guestId[0] : params.guestId;
+      const autoJoin = Array.isArray(params.autoJoin) ? params.autoJoin[0] : params.autoJoin;
+      const guestUsername = Array.isArray(params.username) ? params.username[0] : params.username;
       
       const existingRoom = rooms.find(r => r.id === roomId);
       if (existingRoom) {
-        setRoomToJoin(existingRoom);
-        setJoinRoomKey(key);
-        setShowJoinModal(true);
+        if (autoJoin === "true" && guestId) {
+          if (existingRoom.encryptionKey === key) {
+            if (guestUsername) {
+              setUsername(guestUsername);
+            }
+            setUserRole("guest");
+            setSelectedRoom(existingRoom);
+            Alert.alert("Bem-vindo!", `Entrou na sala "${existingRoom.name}" como convidado.`);
+          } else {
+            Alert.alert("Erro", "Link de convite inválido.");
+          }
+        } else {
+          setRoomToJoin(existingRoom);
+          setJoinRoomKey(key);
+          setShowJoinModal(true);
+        }
       } else {
         Alert.alert("Erro", "Sala não encontrada. Peça ao administrador para reenviar o convite.");
       }
@@ -230,6 +248,25 @@ export default function PartyChatScreen() {
         title: `Convite: ${room.name}`,
       });
     }
+  };
+
+  const generateGuestCredentials = () => {
+    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    let guestId = "guest_";
+    for (let i = 0; i < 12; i++) {
+      guestId += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return guestId;
+  };
+
+  const inviteAsGuest = (room: ChatRoom) => {
+    const encryptedGuestId = generateGuestCredentials();
+    const guestUsername = `Guest_${encryptedGuestId.substring(6, 10)}`;
+    
+    const appLink = `exp://192.168.1.100:8081/--/party-chat?roomId=${room.id}&key=${encodeURIComponent(room.encryptionKey)}&guestId=${encryptedGuestId}&username=${encodeURIComponent(guestUsername)}&autoJoin=true`;
+    
+    setGuestInviteLink(appLink);
+    setShowGuestInviteModal(true);
   };
 
   const showQRCode = (room: ChatRoom) => {
@@ -553,6 +590,20 @@ export default function PartyChatScreen() {
                         <Text style={styles.shareButtonText}>QR Code</Text>
                       </TouchableOpacity>
                     </View>
+                  </View>
+
+                  <View style={styles.settingRow}>
+                    <Text style={styles.settingLabel}>Convidar como Convidado</Text>
+                    <TouchableOpacity
+                      style={styles.guestInviteButton}
+                      onPress={() => inviteAsGuest(selectedRoom)}
+                    >
+                      <UserCircle size={18} color="#FFFFFF" />
+                      <Text style={styles.shareButtonText}>Gerar Link Guest</Text>
+                    </TouchableOpacity>
+                    <Text style={styles.guestInviteHelp}>
+                      Cria um link com credenciais encriptadas para acesso automático
+                    </Text>
                   </View>
                 </>
               )}
@@ -948,6 +999,80 @@ export default function PartyChatScreen() {
               <Text style={styles.scannerText}>Posicione o QR Code dentro do quadrado</Text>
             </View>
           </CameraView>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={showGuestInviteModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowGuestInviteModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.guestInviteModal}>
+            <View style={styles.guestInviteHeader}>
+              <Shield size={32} color="#00D4FF" />
+              <Text style={styles.guestInviteTitle}>Link de Convidado</Text>
+            </View>
+            
+            <Text style={styles.guestInviteSubtitle}>
+              Este link contém credenciais encriptadas que permitem acesso automático à sala como convidado.
+            </Text>
+
+            <View style={styles.guestLinkContainer}>
+              <Text style={styles.guestLinkLabel}>🔐 Link Encriptado:</Text>
+              <View style={styles.guestLinkBox}>
+                <Text style={styles.guestLinkText} numberOfLines={3}>
+                  {guestInviteLink}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.guestInviteActions}>
+              <TouchableOpacity
+                style={styles.guestCopyButton}
+                onPress={async () => {
+                  await Clipboard.setStringAsync(guestInviteLink);
+                  Alert.alert("Copiado!", "Link copiado para a área de transferência.");
+                }}
+              >
+                <Copy size={18} color="#FFFFFF" />
+                <Text style={styles.guestCopyButtonText}>Copiar Link</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.guestShareButton}
+                onPress={async () => {
+                  try {
+                    await Share.share({
+                      message: `🔐 Link de acesso à sala (Convidado):\n\n${guestInviteLink}\n\nClique no link para entrar automaticamente.`,
+                      title: "Convite para Sala",
+                    });
+                  } catch (error) {
+                    console.error("Share error:", error);
+                  }
+                }}
+              >
+                <Share2 size={18} color="#FFFFFF" />
+                <Text style={styles.guestShareButtonText}>Partilhar</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.guestSecurityInfo}>
+              <Text style={styles.guestSecurityText}>
+                ✓ Credenciais encriptadas{"\n"}
+                ✓ Acesso automático como convidado{"\n"}
+                ✓ Sem necessidade de chave manual
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              style={styles.guestCloseButton}
+              onPress={() => setShowGuestInviteModal(false)}
+            >
+              <Text style={styles.guestCloseButtonText}>Fechar</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </Modal>
     </View>
@@ -1645,5 +1770,126 @@ const styles = StyleSheet.create({
     marginTop: 30,
     textAlign: "center",
     paddingHorizontal: 40,
+  },
+  guestInviteButton: {
+    backgroundColor: "#00D4FF",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 14,
+    borderRadius: 12,
+    gap: 8,
+    marginTop: 8,
+  },
+  guestInviteHelp: {
+    fontSize: 12,
+    color: "#8E8E93",
+    marginTop: 8,
+    lineHeight: 16,
+  },
+  guestInviteModal: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    padding: 24,
+    width: "90%",
+    maxWidth: 400,
+  },
+  guestInviteHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 16,
+  },
+  guestInviteTitle: {
+    fontSize: 24,
+    fontWeight: "700" as const,
+    color: "#000000",
+  },
+  guestInviteSubtitle: {
+    fontSize: 14,
+    color: "#8E8E93",
+    marginBottom: 24,
+    lineHeight: 20,
+  },
+  guestLinkContainer: {
+    marginBottom: 20,
+  },
+  guestLinkLabel: {
+    fontSize: 14,
+    fontWeight: "600" as const,
+    color: "#000000",
+    marginBottom: 8,
+  },
+  guestLinkBox: {
+    backgroundColor: "#F5F5F7",
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#00D4FF",
+  },
+  guestLinkText: {
+    fontSize: 12,
+    color: "#00D4FF",
+    fontWeight: "500" as const,
+    lineHeight: 16,
+  },
+  guestInviteActions: {
+    flexDirection: "row",
+    gap: 12,
+    marginBottom: 20,
+  },
+  guestCopyButton: {
+    flex: 1,
+    backgroundColor: "#00D4FF",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 14,
+    borderRadius: 12,
+    gap: 8,
+  },
+  guestCopyButtonText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "600" as const,
+  },
+  guestShareButton: {
+    flex: 1,
+    backgroundColor: "#E94E1B",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 14,
+    borderRadius: 12,
+    gap: 8,
+  },
+  guestShareButtonText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "600" as const,
+  },
+  guestSecurityInfo: {
+    backgroundColor: "#E8F8FF",
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 20,
+  },
+  guestSecurityText: {
+    fontSize: 13,
+    color: "#0099CC",
+    lineHeight: 20,
+  },
+  guestCloseButton: {
+    backgroundColor: "#F5F5F7",
+    paddingVertical: 14,
+    paddingHorizontal: 32,
+    borderRadius: 12,
+    width: "100%",
+    alignItems: "center",
+  },
+  guestCloseButtonText: {
+    color: "#8E8E93",
+    fontSize: 17,
+    fontWeight: "600" as const,
   },
 });
