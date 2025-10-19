@@ -55,6 +55,7 @@ export default function PartyChatScreen() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [showRoomSettings, setShowRoomSettings] = useState(false);
+  const [roomToJoin, setRoomToJoin] = useState<ChatRoom | null>(null);
 
   const [newRoomName, setNewRoomName] = useState("");
   const [newRoomKey, setNewRoomKey] = useState("");
@@ -358,7 +359,7 @@ export default function PartyChatScreen() {
               key={room.id}
               style={styles.roomCard}
               onPress={() => {
-                setSelectedRoom(room);
+                setRoomToJoin(room);
                 setShowJoinModal(true);
               }}
             >
@@ -503,9 +504,9 @@ export default function PartyChatScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modal}>
             <Text style={styles.modalTitle}>Entrar na Sala</Text>
-            {selectedRoom && (
+            {roomToJoin && (
               <Text style={styles.modalSubtitle}>
-                {selectedRoom.name}
+                {roomToJoin.name}
               </Text>
             )}
 
@@ -521,7 +522,7 @@ export default function PartyChatScreen() {
 
             <TouchableOpacity
               style={styles.modalButton}
-              onPress={() => selectedRoom && joinRoom(selectedRoom)}
+              onPress={() => roomToJoin && joinRoom(roomToJoin)}
             >
               <Text style={styles.modalButtonText}>Entrar</Text>
             </TouchableOpacity>
@@ -530,7 +531,7 @@ export default function PartyChatScreen() {
               style={styles.modalCancelButton}
               onPress={() => {
                 setShowJoinModal(false);
-                setSelectedRoom(null);
+                setRoomToJoin(null);
                 setJoinRoomKey("");
               }}
             >
