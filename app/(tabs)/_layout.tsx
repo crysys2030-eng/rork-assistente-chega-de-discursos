@@ -1,5 +1,5 @@
 import { Tabs } from "expo-router";
-import { Newspaper, MessageCircle, Mic } from "lucide-react-native";
+import { Calendar, MessageCircle, Mic } from "lucide-react-native";
 import React from "react";
 
 export default function TabLayout() {
@@ -19,8 +19,8 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: "Notícias",
-          tabBarIcon: ({ color }) => <Newspaper color={color} size={24} />,
+          title: "Agenda",
+          tabBarIcon: ({ color }) => <Calendar color={color} size={24} />,
         }}
       />
       <Tabs.Screen

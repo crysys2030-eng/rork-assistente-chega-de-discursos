@@ -18,7 +18,7 @@ import * as Clipboard from "expo-clipboard";
 
 interface SpeechFormData {
   topic: string;
-  tone: "formal" | "informal" | "inspiracional";
+  tone: "formal" | "informal" | "inspiracional" | "radical";
   duration: string;
   audience: string;
 }
@@ -26,7 +26,7 @@ interface SpeechFormData {
 export default function SpeechScreen() {
   const [formData, setFormData] = useState<SpeechFormData>({
     topic: "",
-    tone: "formal",
+    tone: "radical",
     duration: "5",
     audience: "",
   });
@@ -43,20 +43,30 @@ export default function SpeechScreen() {
 
     setIsGenerating(true);
     try {
-      const prompt = `Crie um discurso em português com as seguintes características:
+      const prompt = `Crie um discurso político em português alinhado com as ideias e valores do partido Chega com as seguintes características:
       
 Tema: ${formData.topic}
 Tom: ${formData.tone}
 Duração estimada: ${formData.duration} minutos
-Audiência: ${formData.audience || "Geral"}
+Audiência: ${formData.audience || "Cidadãos portugueses"}
+
+O discurso deve refletir as posições do Chega:
+- Defesa da soberania nacional e identidade portuguesa
+- Combate à corrupção e privilégios
+- Reforço da segurança e autoridade do Estado
+- Defesa da família tradicional e valores conservadores
+- Crítica ao sistema político estabelecido
+- Patriotismo e orgulho nacional
+- Justiça social com responsabilidade individual
 
 O discurso deve:
-- Ter uma introdução cativante
-- Desenvolver bem os pontos principais
-- Incluir exemplos ou histórias quando apropriado
-- Ter uma conclusão impactante
-- Ser adequado para a duração e tom especificados
-- Usar linguagem adequada para a audiência
+- Ter uma introdução forte e impactante
+- Desenvolver os pontos principais com convicção
+- Incluir referências aos valores portugueses e à história de Portugal
+- Apelar ao sentimento patriótico
+- Ter uma conclusão mobilizadora
+- Ser direto, claro e sem rodeios políticos
+- Refletir o tom ${formData.tone === "radical" ? "mais incisivo e combativo" : formData.tone}
 
 Não inclua títulos ou metadados, apenas o texto do discurso pronto a ser lido.`;
 
@@ -81,7 +91,7 @@ Não inclua títulos ou metadados, apenas o texto do discurso pronto a ser lido.
       <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Preparação de Discursos</Text>
-        <Text style={styles.headerSubtitle}>Crie discursos com IA</Text>
+        <Text style={styles.headerSubtitle}>Discursos alinhados com o Chega</Text>
       </View>
 
       <KeyboardAvoidingView
@@ -98,7 +108,7 @@ Não inclua títulos ou metadados, apenas o texto do discurso pronto a ser lido.
                 onChangeText={(text) =>
                   setFormData({ ...formData, topic: text })
                 }
-                placeholder="Ex: Importância da inovação tecnológica"
+                placeholder="Ex: Combate à corrupção e defesa da soberania"
                 placeholderTextColor="#8E8E93"
                 multiline
               />
@@ -107,7 +117,7 @@ Não inclua títulos ou metadados, apenas o texto do discurso pronto a ser lido.
             <View style={styles.formSection}>
               <Text style={styles.label}>Tom do Discurso</Text>
               <View style={styles.toneButtons}>
-                {(["formal", "informal", "inspiracional"] as const).map(
+                {(["radical", "formal", "inspiracional"] as const).map(
                   (tone) => (
                     <TouchableOpacity
                       key={tone}
@@ -154,7 +164,7 @@ Não inclua títulos ou metadados, apenas o texto do discurso pronto a ser lido.
                 onChangeText={(text) =>
                   setFormData({ ...formData, audience: text })
                 }
-                placeholder="Ex: Empresários, estudantes, público geral"
+                placeholder="Ex: Militantes, cidadãos, assembleia"
                 placeholderTextColor="#8E8E93"
               />
             </View>
