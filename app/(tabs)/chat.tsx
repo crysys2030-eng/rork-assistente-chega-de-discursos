@@ -1,199 +1,137 @@
-import { useRorkAgent } from "@rork/toolkit-sdk";
-import { Stack } from "expo-router";
-import { Send, Loader2, Sparkles, Trash2 } from "lucide-react-native";
-import React, { useState, useRef } from "react";
-import {
-  StyleSheet,
-  Text,
-  View,
-  ScrollView,
-  TextInput,
-  TouchableOpacity,
-  KeyboardAvoidingView,
-  Platform,
-  Alert,
-} from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { LinearGradient } from "expo-linear-gradient";
+import React, { memo, useCallback, useMemo, useRef, useState } from 'react';
+import { Stack } from 'expo-router';
+import { FlatList, KeyboardAvoidingView, ListRenderItemInfo, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Send, MessageSquareMore } from 'lucide-react-native';
 
-export default function ChatScreen() {
-  const [input, setInput] = useState("");
-  const scrollViewRef = useRef<ScrollView>(null);
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-  const { messages, error, sendMessage, setMessages } = useRorkAgent({
-    tools: {},
-  });
+interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant' | 'system';
+  text: string;
+  createdAt: number;
+}
 
+const initialMessages: ChatMessage[] = [
+  { id: 'welcome-1', role: 'assistant', text: 'Olá! Este é o chat. Escreva uma mensagem abaixo.', createdAt: Date.now() - 10000 },
+];
 
-
-  const handleSend = () => {
-    const lastMessage = messages[messages.length - 1];
-    const streaming = lastMessage?.role === "assistant" && lastMessage?.parts.length === 0;
-    
-    if (input.trim() && !streaming) {
-      sendMessage(input);
-      setInput("");
-      setTimeout(() => {
-        scrollViewRef.current?.scrollToEnd({ animated: true });
-      }, 100);
-    }
-  };
-
-  const handleDeleteMessage = (messageId: string) => {
-    Alert.alert(
-      "Eliminar Mensagem",
-      "Deseja eliminar esta mensagem?",
-      [
-        { text: "Cancelar", style: "cancel" },
-        {
-          text: "Eliminar",
-          style: "destructive",
-          onPress: () => {
-            setMessages((prev) => prev.filter((m) => m.id !== messageId));
-          },
-        },
-      ]
-    );
-  };
-
-  const handleClearAll = () => {
-    Alert.alert(
-      "Limpar Conversa",
-      "Deseja eliminar todas as mensagens?",
-      [
-        { text: "Cancelar", style: "cancel" },
-        {
-          text: "Limpar",
-          style: "destructive",
-          onPress: () => {
-            setMessages([]);
-          },
-        },
-      ]
-    );
-  };
+const MessageItem = memo(({ item }: { item: ChatMessage }) => {
+  const isUser = item.role === 'user';
+  const containerStyle = isUser ? styles.userBubble : styles.assistantBubble;
+  const textStyle = isUser ? styles.userText : styles.assistantText;
 
   return (
-    <View style={styles.container}>
-      <Stack.Screen options={{ headerShown: false }} />
-      <LinearGradient
-        colors={["#1a1a2e", "#16213e"]}
-        style={styles.header}
-      >
-        <SafeAreaView edges={["top"]} style={styles.safeArea}>
-        <View style={styles.headerContent}>
-          <Sparkles size={28} color="#00D4FF" />
-          <View style={styles.headerTextContainer}>
-            <Text style={styles.headerTitle}>AI Chat</Text>
-            <Text style={styles.headerSubtitle}>Assistente inteligente</Text>
-          </View>
-          {messages.length > 0 && (
-            <TouchableOpacity onPress={handleClearAll} style={styles.clearButton}>
-              <Trash2 size={20} color="#FF3B30" />
-            </TouchableOpacity>
-          )}
-        </View>
-        </SafeAreaView>
-      </LinearGradient>
+    <View style={[styles.messageRow, isUser ? styles.alignEnd : styles.alignStart]} testID={`message-${item.id}`}>
+      <View style={[styles.bubble, containerStyle]}>
+        <Text style={textStyle}>{item.text}</Text>
+      </View>
+    </View>
+  );
+});
+
+MessageItem.displayName = 'MessageItem';
+
+export default function ChatScreen() {
+  const insets = useSafeAreaInsets();
+  const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
+  const [input, setInput] = useState<string>('');
+  const listRef = useRef<FlatList<ChatMessage>>(null);
+
+  const data = useMemo(() => messages.slice().sort((a, b) => a.createdAt - b.createdAt), [messages]);
+
+  const handleSend = useCallback(() => {
+    try {
+      const trimmed = input.trim();
+      if (!trimmed) return;
+
+      const newMsg: ChatMessage = {
+        id: `local-${Date.now()}`,
+        role: 'user',
+        text: trimmed,
+        createdAt: Date.now(),
+      };
+
+      const echoMsg: ChatMessage = {
+        id: `echo-${Date.now() + 1}`,
+        role: 'assistant',
+        text: 'Recebido: ' + trimmed,
+        createdAt: Date.now() + 1,
+      };
+
+      setMessages(prev => {
+        const next = [...prev, newMsg, echoMsg];
+        return next;
+      });
+
+      setInput('');
+
+      requestAnimationFrame(() => {
+        listRef.current?.scrollToEnd({ animated: true });
+      });
+    } catch (e) {
+      console.log('handleSend error', e);
+    }
+  }, [input]);
+
+  const renderItem = useCallback(({ item }: ListRenderItemInfo<ChatMessage>) => {
+    return <MessageItem item={item} />;
+  }, []);
+
+  const keyExtractor = useCallback((item: ChatMessage) => item.id, []);
+
+  return (
+    <View style={[styles.container, { paddingTop: insets.top }]} testID="chat-screen">
+      <Stack.Screen
+        options={{
+          title: 'Chat',
+          headerTitleAlign: 'center',
+          headerShadowVisible: false,
+          headerRight: () => (
+            <View style={styles.headerRight}>
+              <MessageSquareMore size={22} color="#0f172a" />
+            </View>
+          ),
+        }}
+      />
 
       <KeyboardAvoidingView
-        style={styles.keyboardView}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
+        style={styles.flex}
+        behavior={Platform.select({ ios: 'padding', default: undefined })}
+        keyboardVerticalOffset={Platform.select({ ios: 76, android: 0, default: 0 }) ?? 0}
       >
-        <ScrollView
-          ref={scrollViewRef}
-          style={styles.messagesContainer}
-          contentContainerStyle={styles.messagesContent}
-          onContentSizeChange={() =>
-            scrollViewRef.current?.scrollToEnd({ animated: true })
-          }
-        >
-          {messages.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Sparkles size={64} color="#00D4FF" />
-              <Text style={styles.emptyTitle}>Olá! 👋</Text>
-              <Text style={styles.emptySubtitle}>
-                Faça qualquer pergunta e eu ajudo-o com a resposta.
-              </Text>
-            </View>
-          ) : (
-            messages.map((m) => (
-              <View key={m.id} style={styles.messageWrapper}>
-                <View style={styles.messageContainer}>
-                  {m.parts.map((part, i) => {
-                    if (part.type === "text") {
-                      return (
-                        <View
-                          key={`${m.id}-${i}`}
-                          style={[
-                            styles.messageBubble,
-                            m.role === "user"
-                              ? styles.userBubble
-                              : styles.assistantBubble,
-                          ]}
-                        >
-                          <Text
-                            style={[
-                              styles.messageText,
-                              m.role === "user"
-                                ? styles.userText
-                                : styles.assistantText,
-                            ]}
-                          >
-                            {part.text}
-                          </Text>
-                        </View>
-                      );
-                    }
-                    return null;
-                  })}
-                  <TouchableOpacity
-                    onPress={() => handleDeleteMessage(m.id)}
-                    style={styles.deleteMessageButton}
-                  >
-                    <Trash2 size={16} color="#FF3B30" />
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ))
-          )}
-          {messages.length > 0 && messages[messages.length - 1]?.role === "assistant" && messages[messages.length - 1]?.parts.length === 0 && (
-            <View style={styles.loadingContainer}>
-              <Loader2 size={20} color="#00D4FF" />
-              <Text style={styles.loadingText}>A pensar...</Text>
-            </View>
-          )}
-          {error && (
-            <View style={styles.errorContainer}>
-              <Text style={styles.errorText}>Erro: {error.message}</Text>
-            </View>
-          )}
-        </ScrollView>
+        <FlatList
+          ref={listRef}
+          data={data}
+          keyExtractor={keyExtractor}
+          renderItem={renderItem}
+          contentContainerStyle={styles.listContent}
+          onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
+          onLayout={() => listRef.current?.scrollToEnd({ animated: false })}
+          keyboardShouldPersistTaps="handled"
+          testID="chat-list"
+        />
 
-        <View style={styles.inputContainer}>
+        <View style={styles.inputRow} testID="chat-input-row">
           <TextInput
-            style={styles.input}
             value={input}
             onChangeText={setInput}
-            placeholder="Escreva a sua pergunta..."
-            placeholderTextColor="#8E8E93"
+            placeholder="Digite sua mensagem"
+            placeholderTextColor="#94a3b8"
+            style={styles.input}
             multiline
-            maxLength={1000}
-            editable={true}
+            returnKeyType="send"
+            onSubmitEditing={handleSend}
+            testID="chat-text-input"
           />
-          <LinearGradient
-            colors={!input.trim() ? ["#C7C7CC", "#8E8E93"] : ["#00D4FF", "#0099CC"]}
-            style={styles.sendButton}
+          <TouchableOpacity
+            accessibilityRole="button"
+            onPress={handleSend}
+            style={styles.sendBtn}
+            testID="chat-send-btn"
           >
-            <TouchableOpacity
-              style={styles.sendButtonInner}
-              onPress={handleSend}
-              disabled={!input.trim()}
-            >
-              <Send size={20} color="#FFFFFF" />
-            </TouchableOpacity>
-          </LinearGradient>
+            <Send size={20} color="#ffffff" />
+          </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
     </View>
@@ -201,167 +139,19 @@ export default function ChatScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#0f0f23",
-  },
-  header: {
-    paddingBottom: 20,
-  },
-  safeArea: {
-    paddingHorizontal: 20,
-  },
-  headerContent: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  headerTextContainer: {
-    flex: 1,
-  },
-  clearButton: {
-    padding: 8,
-  },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: "700" as const,
-    color: "#FFFFFF",
-    marginBottom: 4,
-  },
-  headerSubtitle: {
-    fontSize: 15,
-    color: "#00D4FF",
-    fontWeight: "500" as const,
-  },
-  keyboardView: {
-    flex: 1,
-  },
-  messagesContainer: {
-    flex: 1,
-    backgroundColor: "#0f0f23",
-  },
-  messagesContent: {
-    padding: 16,
-    gap: 12,
-  },
-  emptyState: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 40,
-    marginTop: 100,
-  },
-  emptyTitle: {
-    fontSize: 32,
-    marginBottom: 12,
-    color: "#FFFFFF",
-    marginTop: 16,
-  },
-  emptySubtitle: {
-    fontSize: 17,
-    color: "#8E8E93",
-    textAlign: "center",
-    lineHeight: 24,
-  },
-  messageWrapper: {
-    marginBottom: 12,
-  },
-  messageContainer: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    gap: 8,
-  },
-  deleteMessageButton: {
-    padding: 4,
-    opacity: 0.6,
-  },
-  messageBubble: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 20,
-    maxWidth: "80%",
-  },
-  userBubble: {
-    backgroundColor: "#00D4FF",
-    alignSelf: "flex-end",
-    marginLeft: "20%",
-  },
-  assistantBubble: {
-    backgroundColor: "#1e1e3f",
-    alignSelf: "flex-start",
-    marginRight: "20%",
-    shadowColor: "#00D4FF",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  messageText: {
-    fontSize: 16,
-    lineHeight: 22,
-  },
-  userText: {
-    color: "#0f0f23",
-  },
-  assistantText: {
-    color: "#FFFFFF",
-  },
-  loadingContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: "#1e1e3f",
-    alignSelf: "flex-start",
-    borderRadius: 20,
-    marginRight: "20%",
-  },
-  loadingText: {
-    fontSize: 15,
-    color: "#00D4FF",
-  },
-  errorContainer: {
-    backgroundColor: "#FFE5E5",
-    padding: 12,
-    borderRadius: 12,
-    marginTop: 8,
-  },
-  errorText: {
-    color: "#D32F2F",
-    fontSize: 14,
-  },
-  inputContainer: {
-    flexDirection: "row",
-    padding: 16,
-    backgroundColor: "#FFFFFF",
-    borderTopWidth: 1,
-    borderTopColor: "#E5E5EA",
-    alignItems: "flex-end",
-    gap: 12,
-  },
-  input: {
-    flex: 1,
-    backgroundColor: "#F5F5F7",
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 16,
-    color: "#000000",
-    maxHeight: 100,
-  },
-  sendButton: {
-    borderRadius: 22,
-    shadowColor: "#00D4FF",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  sendButtonInner: {
-    width: 44,
-    height: 44,
-    justifyContent: "center",
-    alignItems: "center",
-  },
+  container: { flex: 1, backgroundColor: '#f8fafc' },
+  flex: { flex: 1 },
+  headerRight: { paddingRight: 12 },
+  listContent: { paddingHorizontal: 12, paddingVertical: 16 },
+  messageRow: { width: '100%', marginVertical: 6 },
+  alignStart: { alignItems: 'flex-start' },
+  alignEnd: { alignItems: 'flex-end' },
+  bubble: { maxWidth: '82%', borderRadius: 16, paddingVertical: 10, paddingHorizontal: 12 },
+  userBubble: { backgroundColor: '#2563eb' },
+  assistantBubble: { backgroundColor: '#e2e8f0' },
+  userText: { color: '#ffffff', fontSize: 16, lineHeight: 22 },
+  assistantText: { color: '#0f172a', fontSize: 16, lineHeight: 22 },
+  inputRow: { flexDirection: 'row', alignItems: 'flex-end', padding: 12, gap: 8, backgroundColor: '#ffffff', borderTopWidth: 1, borderTopColor: '#e2e8f0' },
+  input: { flex: 1, minHeight: 40, maxHeight: 120, paddingVertical: 10, paddingHorizontal: 12, backgroundColor: '#f1f5f9', borderRadius: 12, color: '#0f172a', fontSize: 16 },
+  sendBtn: { height: 44, width: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0ea5e9' },
 });
