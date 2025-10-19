@@ -1,6 +1,6 @@
-import { generateText } from "@rork/toolkit-sdk";
+import { generateObject } from "@rork/toolkit-sdk";
 import { Stack } from "expo-router";
-import { Sparkles, Loader2, Copy, Check } from "lucide-react-native";
+import { Sparkles, Loader2, Copy, Check, ExternalLink } from "lucide-react-native";
 import React, { useState } from "react";
 import {
   StyleSheet,
@@ -12,9 +12,11 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  Linking,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as Clipboard from "expo-clipboard";
+import { z } from "zod";
 
 interface SpeechFormData {
   topic: string;
@@ -32,6 +34,7 @@ export default function SpeechScreen() {
   });
 
   const [generatedSpeech, setGeneratedSpeech] = useState("");
+  const [sources, setSources] = useState<Array<{ title: string; url: string; relevance: string }>>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -43,6 +46,17 @@ export default function SpeechScreen() {
 
     setIsGenerating(true);
     try {
+      const schema = z.object({
+        speech: z.string().describe("O texto completo do discurso político"),
+        sources: z.array(
+          z.object({
+            title: z.string().describe("Título ou descrição da fonte"),
+            url: z.string().describe("URL real e verificável da fonte"),
+            relevance: z.string().describe("Como esta fonte comprova os pontos do discurso")
+          })
+        ).describe("Lista de fontes reais e verificáveis que comprovam os factos mencionados")
+      });
+
       const prompt = `Crie um discurso político em português alinhado com as ideias e valores do partido Chega com as seguintes características:
       
 Tema: ${formData.topic}
@@ -67,11 +81,25 @@ O discurso deve:
 - Ter uma conclusão mobilizadora
 - Ser direto, claro e sem rodeios políticos
 - Refletir o tom ${formData.tone === "radical" ? "mais incisivo e combativo" : formData.tone}
+- Focar sempre em Portugal, Europa e o Mundo
+- Quando mencionar situações em que Portugal foi prejudicado, usar factos verificáveis
 
-Não inclua títulos ou metadados, apenas o texto do discurso pronto a ser lido.`;
+IMPORTANTE: Fornece SEMPRE fontes reais e verificáveis para os factos mencionados:
+- URLs reais de fontes credíveis (jornais portugueses, sites governamentais, organizações internacionais)
+- Cada facto importante deve ter uma fonte associada
+- Quando mencionar que Portugal foi prejudicado, fornecer provas concretas com fontes
+- Priorizar fontes portuguesas quando disponíveis (ex: Público, Expresso, Observador, sites .gov.pt)
+- Incluir também fontes europeias e internacionais quando relevante
 
-      const speech = await generateText(prompt);
-      setGeneratedSpeech(speech);
+Não inclua títulos ou metadados no discurso, apenas o texto pronto a ser lido.`;
+
+      const result = await generateObject({
+        messages: [{ role: "user", content: prompt }],
+        schema
+      });
+      
+      setGeneratedSpeech(result.speech);
+      setSources(result.sources);
     } catch (error) {
       console.error("Error generating speech:", error);
       Alert.alert("Erro", "Não foi possível gerar o discurso. Tente novamente.");
@@ -205,6 +233,42 @@ Não inclua títulos ou metadados, apenas o texto do discurso pronto a ser lido.
                 <ScrollView style={styles.speechContainer}>
                   <Text style={styles.speechText}>{generatedSpeech}</Text>
                 </ScrollView>
+                
+                {sources.length > 0 && (
+                  <View style={styles.sourcesContainer}>
+                    <Text style={styles.sourcesTitle}>📚 Fontes e Provas</Text>
+                    <Text style={styles.sourcesSubtitle}>
+                      Fontes verificáveis que comprovam os factos mencionados
+                    </Text>
+                    {sources.map((source, index) => (
+                      <TouchableOpacity
+                        key={index}
+                        style={styles.sourceCard}
+                        onPress={() => {
+                          Linking.openURL(source.url).catch(() => {
+                            Alert.alert("Erro", "Não foi possível abrir o link.");
+                          });
+                        }}
+                      >
+                        <View style={styles.sourceHeader}>
+                          <Text style={styles.sourceNumber}>{index + 1}</Text>
+                          <View style={styles.sourceContent}>
+                            <Text style={styles.sourceTitle}>{source.title}</Text>
+                            <Text style={styles.sourceRelevance}>
+                              {source.relevance}
+                            </Text>
+                            <View style={styles.sourceUrlContainer}>
+                              <Text style={styles.sourceUrl} numberOfLines={1}>
+                                {source.url}
+                              </Text>
+                              <ExternalLink size={14} color="#E94E1B" />
+                            </View>
+                          </View>
+                        </View>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
               </View>
             ) : null}
           </View>
@@ -340,5 +404,70 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#000000",
     lineHeight: 24,
+  },
+  sourcesContainer: {
+    marginTop: 20,
+    gap: 12,
+  },
+  sourcesTitle: {
+    fontSize: 20,
+    fontWeight: "700" as const,
+    color: "#000000",
+    marginBottom: 4,
+  },
+  sourcesSubtitle: {
+    fontSize: 14,
+    color: "#8E8E93",
+    marginBottom: 8,
+  },
+  sourceCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "#E5E5EA",
+    marginBottom: 8,
+  },
+  sourceHeader: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  sourceNumber: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "#E94E1B",
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "700" as const,
+    textAlign: "center",
+    lineHeight: 28,
+  },
+  sourceContent: {
+    flex: 1,
+    gap: 6,
+  },
+  sourceTitle: {
+    fontSize: 16,
+    fontWeight: "600" as const,
+    color: "#000000",
+    lineHeight: 22,
+  },
+  sourceRelevance: {
+    fontSize: 14,
+    color: "#000000",
+    lineHeight: 20,
+  },
+  sourceUrlContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 4,
+  },
+  sourceUrl: {
+    flex: 1,
+    fontSize: 13,
+    color: "#E94E1B",
+    fontWeight: "500" as const,
   },
 });
