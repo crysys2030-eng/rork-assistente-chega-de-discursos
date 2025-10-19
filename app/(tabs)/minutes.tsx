@@ -177,24 +177,36 @@ function MinutesScreen() {
           .describe("Lista de tarefas e ações a realizar"),
       });
 
-      const prompt = `Analisa as seguintes notas de reunião e gera uma minuta estruturada e profissional:
+      const prompt = `Analisa as seguintes notas de reunião do partido político Chega e gera uma minuta estruturada, profissional e focada no contexto político português:
 
 Título: ${meetingTitle}
 Notas: ${meetingNotes}
 
 Cria uma minuta de reunião completa que inclua:
 1. Data da reunião (inferir da informação ou usar data de hoje)
-2. Lista de participantes/presentes
-3. Principais tópicos discutidos (em forma de lista)
-4. Resumo detalhado da reunião
+2. Lista de participantes/presentes (membros do partido, dirigentes, militantes)
+3. Principais tópicos discutidos:
+   - Estratégias políticas
+   - Ações partidárias
+   - Mobilização
+   - Campanha eleitoral
+   - Iniciativas legislativas
+   - Outros temas relevantes
+4. Resumo detalhado da reunião com foco em:
+   - Decisões tomadas
+   - Debates realizados
+   - Posicionamentos definidos
 5. Tarefas e ações a realizar, com:
-   - Descrição clara da tarefa
+   - Descrição clara e orientada para ação política
    - Prioridade (alta, média ou baixa)
-   - Responsável pela tarefa (se mencionado)
-   - Prazo de conclusão (se mencionado)
+   - Responsável pela tarefa (dirigente, coordenador, equipa)
+   - Prazo de conclusão
 
-A minuta deve ser profissional, clara e focada em pontos de ação concretos.
-Contexto: Reunião do partido político Chega em Portugal.`;
+A minuta deve ser:
+- Profissional e adequada ao contexto partidário
+- Clara e objetiva
+- Focada em pontos de ação concretos
+- Alinhada com os valores e objetivos do partido Chega`;
 
       const result = await generateObject({
         messages: [{ role: "user", content: prompt }],
@@ -464,7 +476,7 @@ Contexto: Reunião do partido político Chega em Portugal.`;
       <LinearGradient colors={["#1a1a2e", "#16213e"]} style={[styles.header, { paddingTop: insets.top + 20 }]}>
           <View style={styles.headerContent}>
             <View>
-              <Text style={styles.headerTitle}>📝 Minutas e Tarefas</Text>
+              <Text style={styles.headerTitle}>📝 Minutas Chega</Text>
               <Text style={styles.headerSubtitle}>Geradas com IA</Text>
             </View>
             <LinearGradient
@@ -487,7 +499,7 @@ Contexto: Reunião do partido político Chega em Portugal.`;
             <FileText size={64} color="#C7C7CC" />
             <Text style={styles.emptyTitle}>Nenhuma minuta criada</Text>
             <Text style={styles.emptySubtitle}>
-              Use IA para gerar minutas de reuniões com tarefas
+              Use IA para gerar minutas de reuniões do partido Chega
             </Text>
           </View>
         ) : (
@@ -678,7 +690,7 @@ Contexto: Reunião do partido político Chega em Portugal.`;
           >
             <View style={styles.modalContent}>
               <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Gerar Minuta com IA</Text>
+                <Text style={styles.modalTitle}>Gerar Minuta Chega com IA</Text>
                 <TouchableOpacity
                   onPress={() => setShowGenerateModal(false)}
                 >
@@ -693,7 +705,7 @@ Contexto: Reunião do partido político Chega em Portugal.`;
                     style={styles.input}
                     value={meetingTitle}
                     onChangeText={setMeetingTitle}
-                    placeholder="Ex: Reunião Semanal de Coordenação"
+                    placeholder="Ex: Reunião de Coordenação Nacional Chega"
                     placeholderTextColor="#8E8E93"
                   />
                 </View>
@@ -704,7 +716,7 @@ Contexto: Reunião do partido político Chega em Portugal.`;
                     style={[styles.input, styles.textArea]}
                     value={meetingNotes}
                     onChangeText={setMeetingNotes}
-                    placeholder="Cole ou escreva as notas da reunião aqui... A IA irá analisar e criar uma minuta estruturada com resumo e lista de tarefas."
+                    placeholder="Cole ou escreva as notas da reunião do partido Chega aqui... A IA irá analisar e criar uma minuta estruturada com resumo, decisões políticas e lista de tarefas partidárias."
                     placeholderTextColor="#8E8E93"
                     multiline
                     numberOfLines={10}
