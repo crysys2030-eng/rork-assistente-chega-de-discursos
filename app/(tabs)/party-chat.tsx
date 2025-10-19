@@ -248,8 +248,7 @@ export default function PartyChatScreen() {
                   <UserCircle size={14} color="#00D4FF" />
                 )}
                 <Text style={styles.chatHeaderSubtitle}>
-                  {userRole === "admin" ? "Admin" : "Convidado"} •{" "}
-                  {selectedRoom.isPrivate ? "Privada" : "Pública"}
+                  {userRole === "admin" ? "Admin" : "Convidado"} • {selectedRoom.isPrivate ? "Privada" : "Pública"}
                 </Text>
               </View>
             </View>
@@ -532,8 +531,7 @@ export default function PartyChatScreen() {
                     ]}
                   />
                   <Text style={styles.roomMetaText}>
-                    {room.isActive ? "Ativa" : "Inativa"} •{" "}
-                    {room.isPrivate ? "Privada" : "Pública"}
+                    {room.isActive ? "Ativa" : "Inativa"} • {room.isPrivate ? "Privada" : "Pública"}
                   </Text>
                 </View>
               </View>
