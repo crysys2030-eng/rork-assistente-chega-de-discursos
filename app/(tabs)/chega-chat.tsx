@@ -97,7 +97,7 @@ export default function ChegaChatScreen() {
 
   const chegaNote = useMemo(
     () =>
-      "Este chat responde de forma factual e neutra sobre temas do partido Chega, com base em informações públicas.",
+      "Este chat é focado em Portugal e responde de acordo com as narrativas e posicionamentos oficiais do partido Chega, com base em fontes públicas.",
     []
   );
 
@@ -107,19 +107,28 @@ export default function ChegaChatScreen() {
 
   const data = (messages as unknown as ChatMessageItem[]) ?? [];
 
+  const systemPrompt = useMemo(
+    () =>
+      "Respondes sempre em português de Portugal. Mantém-te estritamente alinhado com as narrativas, prioridades e comunicados oficiais do partido Chega. Quando a pergunta não for sobre Portugal ou não tiver relação com o contexto político e social português, pede para reformular para o contexto de Portugal. Baseia-te em informação pública; se não tiveres confiança suficiente, indica limitações com transparência e sugere fontes públicas. Evita opiniões pessoais não alinhadas e não fales em nome de outras entidades.",
+    []
+  );
+
+  
+
   const onSend = useCallback(async () => {
     const value = input.trim();
     if (!value) return;
     try {
       console.log("ChegaChat: sending message", value);
-      await sendMessage({ text: value });
+      const composed = `Instruções: ${systemPrompt}\n\nPergunta: ${value}`;
+      await sendMessage({ text: composed });
       setInput("");
       setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100);
     } catch (e) {
       console.error("ChegaChat: send error", e);
       Alert.alert("Erro", "Não foi possível enviar a mensagem. Tente novamente.");
     }
-  }, [input, sendMessage]);
+  }, [input, sendMessage, systemPrompt]);
 
   const clearChat = useCallback(() => {
     try {
@@ -140,7 +149,7 @@ export default function ChegaChatScreen() {
           <View style={styles.headerRow}>
             <View style={styles.headerTitles}>
               <Text style={styles.title} testID="chat-title">Chat AI Chega</Text>
-              <Text style={styles.subtitle} testID="chat-subtitle">Informações públicas e respostas neutras</Text>
+              <Text style={styles.subtitle} testID="chat-subtitle">Contexto Portugal • Alinhado com narrativas oficiais</Text>
             </View>
             <TouchableOpacity onPress={clearChat} style={styles.clearButton} testID="clear-chat">
               <Trash2 size={18} color="#FFFFFF" />
