@@ -38,6 +38,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import * as Clipboard from "expo-clipboard";
 import { z } from "zod";
 import * as FileSystem from "expo-file-system";
+import * as Sharing from "expo-sharing";
 
 interface TaskNote {
   task: string;
@@ -279,141 +280,41 @@ A minuta deve ser:
   };
 
   const generatePDF = async (minute: Minute) => {
-    if (Platform.OS === 'web') {
-      Alert.alert("Info", "Geração de PDF não disponível na web. Use a opção copiar e cole num editor de texto.");
-      return;
-    }
-
     setIsGeneratingPDF(true);
     try {
-      const htmlContent = `
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <meta charset="UTF-8">
-            <style>
-              body {
-                font-family: Arial, sans-serif;
-                padding: 40px;
-                color: #333;
-              }
-              h1 {
-                color: #00D4FF;
-                border-bottom: 3px solid #00D4FF;
-                padding-bottom: 10px;
-              }
-              h2 {
-                color: #0099CC;
-                margin-top: 30px;
-                margin-bottom: 15px;
-              }
-              .info {
-                background: #f5f5f5;
-                padding: 15px;
-                border-radius: 8px;
-                margin: 20px 0;
-              }
-              .info p {
-                margin: 5px 0;
-              }
-              ul {
-                line-height: 1.8;
-              }
-              .task {
-                background: #e8f8ff;
-                padding: 15px;
-                margin: 10px 0;
-                border-left: 4px solid #00D4FF;
-                border-radius: 4px;
-              }
-              .priority-high { border-left-color: #FF3B30; }
-              .priority-medium { border-left-color: #FF9500; }
-              .priority-low { border-left-color: #34C759; }
-              .task-meta {
-                font-size: 0.9em;
-                color: #666;
-                margin-top: 5px;
-              }
-              .task-list-item {
-                padding: 8px;
-                margin: 5px 0;
-                background: #f9f9f9;
-                border-radius: 4px;
-              }
-              .completed {
-                text-decoration: line-through;
-                color: #999;
-              }
-            </style>
-          </head>
-          <body>
-            <h1>MINUTA DE REUNIÃO</h1>
-            <div class="info">
-              <p><strong>Título:</strong> ${minute.title}</p>
-              <p><strong>Data:</strong> ${minute.date}</p>
-            </div>
-            
-            <h2>👥 Participantes</h2>
-            <ul>
-              ${minute.attendees.map((a) => `<li>${a}</li>`).join("")}
-            </ul>
-            
-            <h2>📋 Tópicos Discutidos</h2>
-            <ul>
-              ${minute.topics.map((t) => `<li>${t}</li>`).join("")}
-            </ul>
-            
-            <h2>📄 Resumo</h2>
-            <p>${minute.summary}</p>
-            
-            <h2>✅ Tarefas e Ações</h2>
-            ${minute.tasks
-              .map(
-                (task) => `
-              <div class="task priority-${task.priority}">
-                <strong>${task.task}</strong>
-                <div class="task-meta">
-                  <span>Prioridade: ${task.priority === "high" ? "ALTA" : task.priority === "medium" ? "MÉDIA" : "BAIXA"}</span>
-                  ${task.assignedTo ? `<br>Responsável: ${task.assignedTo}` : ""}
-                  ${task.deadline ? `<br>Prazo: ${task.deadline}` : ""}
-                </div>
-              </div>
-            `
-              )
-              .join("")}
-            
-            ${minute.taskList && minute.taskList.length > 0 ? `
-              <h2>📝 Lista de Tarefas Realizadas</h2>
-              ${minute.taskList
-                .map(
-                  (task) => `
-                <div class="task-list-item ${task.completed ? "completed" : ""}">
-                  ${task.completed ? "✓" : "○"} ${task.title}
-                </div>
-              `
-                )
-                .join("")}
-            ` : ""}
-          </body>
-        </html>
-      `;
-
-      const fileName = `minuta_${minute.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_${Date.now()}.pdf`;
+      const textContent = formatMinuteText(minute);
+      const fileName = `minuta_${minute.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_${Date.now()}.txt`;
       const filePath = `${FileSystem.documentDirectory}${fileName}`;
 
-      await FileSystem.writeAsStringAsync(filePath, htmlContent, {
+      await FileSystem.writeAsStringAsync(filePath, textContent, {
         encoding: FileSystem.EncodingType.UTF8,
       });
 
-      await Share.share({
-        url: filePath,
-        message: `Minuta: ${minute.title}`,
-      });
-
-      Alert.alert("Sucesso", "PDF gerado e pronto para partilhar!");
+      if (Platform.OS === 'web') {
+        const blob = new Blob([textContent], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        Alert.alert("Sucesso", "Documento transferido!");
+      } else {
+        const canShare = await Sharing.isAvailableAsync();
+        if (canShare) {
+          await Sharing.shareAsync(filePath);
+        } else {
+          await Share.share({
+            message: textContent,
+            title: `Minuta: ${minute.title}`,
+          });
+        }
+      }
     } catch (error) {
-      console.error("Error generating PDF:", error);
-      Alert.alert("Erro", "Não foi possível gerar o PDF. Por favor, copie o texto.");
+      console.error("Error generating document:", error);
+      Alert.alert("Erro", "Não foi possível gerar o documento. Use a opção copiar.");
     } finally {
       setIsGeneratingPDF(false);
     }
@@ -642,7 +543,7 @@ A minuta deve ser:
                           ) : (
                             <FileDown size={18} color="#00D4FF" />
                           )}
-                          <Text style={styles.actionButtonText}>PDF</Text>
+                          <Text style={styles.actionButtonText}>Exportar</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
                           style={styles.actionButton}

@@ -1,4 +1,4 @@
-import { Stack } from "expo-router";
+import { Stack, useLocalSearchParams } from "expo-router";
 import {
   Users,
   Plus,
@@ -17,8 +17,9 @@ import {
   Check,
   Shield,
   Trash2,
+  QrCode,
 } from "lucide-react-native";
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   StyleSheet,
   Text,
@@ -62,6 +63,8 @@ type Message = {
 };
 
 export default function PartyChatScreen() {
+  const params = useLocalSearchParams();
+  const hasProcessedDeepLink = useRef(false);
   const insets = useSafeAreaInsets();
   const [rooms, setRooms] = useState<ChatRoom[]>([]);
   const [selectedRoom, setSelectedRoom] = useState<ChatRoom | null>(null);
@@ -74,6 +77,8 @@ export default function PartyChatScreen() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [showRoomSettings, setShowRoomSettings] = useState(false);
+  const [showQRModal, setShowQRModal] = useState(false);
+  const [qrCodeData, setQrCodeData] = useState("");
   const [roomToJoin, setRoomToJoin] = useState<ChatRoom | null>(null);
 
   const [newRoomName, setNewRoomName] = useState("");
@@ -81,6 +86,23 @@ export default function PartyChatScreen() {
   const [newRoomIsPrivate, setNewRoomIsPrivate] = useState(true);
   const [newRoomIsUrgent, setNewRoomIsUrgent] = useState(false);
   const [joinRoomKey, setJoinRoomKey] = useState("");
+
+  useEffect(() => {
+    if (params.roomId && params.key && !hasProcessedDeepLink.current) {
+      hasProcessedDeepLink.current = true;
+      const roomId = Array.isArray(params.roomId) ? params.roomId[0] : params.roomId;
+      const key = Array.isArray(params.key) ? params.key[0] : params.key;
+      
+      const existingRoom = rooms.find(r => r.id === roomId);
+      if (existingRoom) {
+        setRoomToJoin(existingRoom);
+        setJoinRoomKey(key);
+        setShowJoinModal(true);
+      } else {
+        Alert.alert("Erro", "Sala não encontrada. Peça ao administrador para reenviar o convite.");
+      }
+    }
+  }, [params, rooms]);
 
   const generateKey = () => {
     const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
@@ -178,10 +200,10 @@ export default function PartyChatScreen() {
   };
 
   const shareToWhatsApp = async (room: ChatRoom) => {
-    const inviteLink = `chega://room/${room.id}?key=${encodeURIComponent(room.encryptionKey)}&name=${encodeURIComponent(room.name)}`;
-    const webLink = `https://chega.app/join/${room.id}?key=${encodeURIComponent(room.encryptionKey)}`;
+    const appLink = `exp://192.168.1.100:8081/--/party-chat?roomId=${room.id}&key=${encodeURIComponent(room.encryptionKey)}`;
+    const webLink = `https://suaapp.com/party-chat?roomId=${room.id}&key=${encodeURIComponent(room.encryptionKey)}`;
     
-    const message = `🔐 *Convite para Sala do Partido Chega*\n\n📌 *Sala:* ${room.name}\n🔑 *Código:* ${room.encryptionKey}\n\n🔗 *Link de Acesso:*\n${webLink}\n\nClique no link ou abra a aplicação e use o código acima para aceder.\n\n*Link Direto:* ${inviteLink}`;
+    const message = `🔐 *Convite para Sala do Partido Chega*\n\n📌 *Sala:* ${room.name}\n🔑 *Código:* ${room.encryptionKey}\n\n🔗 *Link de Acesso:*\n${appLink}\n\nClique no link ou abra a aplicação e use o código acima para aceder.`;
 
     const whatsappUrl = `whatsapp://send?text=${encodeURIComponent(message)}`;
 
@@ -196,28 +218,23 @@ export default function PartyChatScreen() {
         });
       }
     } catch (error) {
-      Alert.alert(
-        "Partilhar Convite",
-        `Sala: ${room.name}\nCódigo: ${room.encryptionKey}\n\nLink: ${webLink}`,
-        [
-          {
-            text: "Copiar Link",
-            onPress: async () => {
-              await Clipboard.setStringAsync(webLink);
-              Alert.alert("Copiado", "Link copiado para a área de transferência");
-            },
-          },
-          {
-            text: "Copiar Código",
-            onPress: async () => {
-              await Clipboard.setStringAsync(room.encryptionKey);
-              Alert.alert("Copiado", "Código copiado para a área de transferência");
-            },
-          },
-          { text: "Fechar", style: "cancel" },
-        ]
-      );
+      console.error("Share error:", error);
+      await Share.share({
+        message: message,
+        title: `Convite: ${room.name}`,
+      });
     }
+  };
+
+  const showQRCode = (room: ChatRoom) => {
+    const qrData = JSON.stringify({
+      roomId: room.id,
+      roomName: room.name,
+      key: room.encryptionKey,
+      type: "chega-room-invite"
+    });
+    setQrCodeData(qrData);
+    setShowQRModal(true);
   };
 
   const copyKey = async (key: string) => {
@@ -417,18 +434,27 @@ export default function PartyChatScreen() {
               </View>
 
               {userRole === "admin" && (
-                <View style={styles.settingRow}>
-                  <Text style={styles.settingLabel}>Partilhar Sala</Text>
-                  <TouchableOpacity
-                    style={styles.shareButton}
-                    onPress={() => shareToWhatsApp(selectedRoom)}
-                  >
-                    <Share2 size={18} color="#FFFFFF" />
-                    <Text style={styles.shareButtonText}>
-                      Enviar Convite via WhatsApp
-                    </Text>
-                  </TouchableOpacity>
-                </View>
+                <>
+                  <View style={styles.settingRow}>
+                    <Text style={styles.settingLabel}>Partilhar Sala</Text>
+                    <View style={styles.shareButtonsRow}>
+                      <TouchableOpacity
+                        style={styles.shareButton}
+                        onPress={() => shareToWhatsApp(selectedRoom)}
+                      >
+                        <Share2 size={18} color="#FFFFFF" />
+                        <Text style={styles.shareButtonText}>WhatsApp</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.shareButton, styles.qrButton]}
+                        onPress={() => showQRCode(selectedRoom)}
+                      >
+                        <QrCode size={18} color="#FFFFFF" />
+                        <Text style={styles.shareButtonText}>QR Code</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </>
               )}
 
               {userRole === "admin" && (
@@ -720,6 +746,52 @@ export default function PartyChatScreen() {
               }}
             >
               <Text style={styles.modalCancelText}>Cancelar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={showQRModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowQRModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.qrModal}>
+            <Text style={styles.qrTitle}>QR Code da Sala</Text>
+            <Text style={styles.qrSubtitle}>Escaneie para entrar</Text>
+            
+            <View style={styles.qrContainer}>
+              <View style={styles.qrPlaceholder}>
+                <QrCode size={200} color="#00D4FF" />
+                <Text style={styles.qrPlaceholderText}>QR Code</Text>
+              </View>
+            </View>
+
+            <View style={styles.qrInfo}>
+              <Text style={styles.qrInfoLabel}>Código Manual:</Text>
+              <View style={styles.qrCodeDisplay}>
+                <Text style={styles.qrCodeText}>{qrCodeData.length > 0 ? JSON.parse(qrCodeData).key : ""}</Text>
+                <TouchableOpacity
+                  onPress={async () => {
+                    if (qrCodeData) {
+                      const data = JSON.parse(qrCodeData);
+                      await Clipboard.setStringAsync(data.key);
+                      Alert.alert("Copiado", "Código copiado!");
+                    }
+                  }}
+                >
+                  <Copy size={20} color="#00D4FF" />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={styles.qrCloseButton}
+              onPress={() => setShowQRModal(false)}
+            >
+              <Text style={styles.qrCloseText}>Fechar</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -1176,6 +1248,10 @@ const styles = StyleSheet.create({
     color: "#E94E1B",
     flex: 1,
   },
+  shareButtonsRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
   shareButton: {
     backgroundColor: "#25D366",
     flexDirection: "row",
@@ -1184,10 +1260,14 @@ const styles = StyleSheet.create({
     padding: 14,
     borderRadius: 12,
     gap: 8,
+    flex: 1,
+  },
+  qrButton: {
+    backgroundColor: "#00D4FF",
   },
   shareButtonText: {
     color: "#FFFFFF",
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: "600" as const,
   },
   roleDisplay: {
@@ -1252,5 +1332,84 @@ const styles = StyleSheet.create({
     color: "#8E8E93",
     fontSize: 17,
     fontWeight: "500" as const,
+  },
+  qrModal: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    padding: 24,
+    width: "90%",
+    maxWidth: 400,
+    alignItems: "center",
+  },
+  qrTitle: {
+    fontSize: 24,
+    fontWeight: "700" as const,
+    color: "#000000",
+    marginBottom: 8,
+  },
+  qrSubtitle: {
+    fontSize: 16,
+    color: "#8E8E93",
+    marginBottom: 24,
+  },
+  qrContainer: {
+    backgroundColor: "#F5F5F7",
+    padding: 20,
+    borderRadius: 16,
+    marginBottom: 24,
+  },
+  qrPlaceholder: {
+    width: 240,
+    height: 240,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: "#00D4FF",
+    borderStyle: "dashed",
+  },
+  qrPlaceholderText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: "#00D4FF",
+    fontWeight: "600" as const,
+  },
+  qrInfo: {
+    width: "100%",
+    marginBottom: 20,
+  },
+  qrInfoLabel: {
+    fontSize: 14,
+    fontWeight: "600" as const,
+    color: "#000000",
+    marginBottom: 8,
+  },
+  qrCodeDisplay: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#F5F5F7",
+    padding: 16,
+    borderRadius: 12,
+  },
+  qrCodeText: {
+    fontSize: 16,
+    fontWeight: "600" as const,
+    color: "#00D4FF",
+    flex: 1,
+  },
+  qrCloseButton: {
+    backgroundColor: "#00D4FF",
+    paddingVertical: 14,
+    paddingHorizontal: 32,
+    borderRadius: 12,
+    width: "100%",
+    alignItems: "center",
+  },
+  qrCloseText: {
+    color: "#FFFFFF",
+    fontSize: 17,
+    fontWeight: "600" as const,
   },
 });
