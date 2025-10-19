@@ -333,7 +333,7 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 15,
     fontWeight: "600" as const,
-    color: "#000000",
+    color: "#FFFFFF",
     marginBottom: 4,
   },
   textInput: {
@@ -405,7 +405,7 @@ const styles = StyleSheet.create({
   resultTitle: {
     fontSize: 20,
     fontWeight: "700" as const,
-    color: "#000000",
+    color: "#FFFFFF",
   },
   copyButton: {
     padding: 8,
@@ -430,7 +430,7 @@ const styles = StyleSheet.create({
   sourcesTitle: {
     fontSize: 20,
     fontWeight: "700" as const,
-    color: "#000000",
+    color: "#FFFFFF",
     marginBottom: 4,
   },
   sourcesSubtitle: {
