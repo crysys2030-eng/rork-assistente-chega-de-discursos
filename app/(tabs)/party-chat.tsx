@@ -16,6 +16,7 @@ import {
   Copy,
   Check,
   Shield,
+  Trash2,
 } from "lucide-react-native";
 import React, { useState } from "react";
 import {
@@ -159,6 +160,23 @@ export default function PartyChatScreen() {
     setInput("");
   };
 
+  const deleteMessage = (messageId: string) => {
+    Alert.alert(
+      "Eliminar Mensagem",
+      "Deseja eliminar esta mensagem?",
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Eliminar",
+          style: "destructive",
+          onPress: () => {
+            setMessages(messages.filter((m) => m.id !== messageId));
+          },
+        },
+      ]
+    );
+  };
+
   const shareToWhatsApp = async (room: ChatRoom) => {
     const inviteLink = `chega://room/${room.id}`;
     const message = `🔐 *Convite para Sala do Partido Chega*\n\n📌 *Sala:* ${room.name}\n🔑 *Código:* ${room.encryptionKey}\n\nEntre na aplicação e use o código acima para aceder.\n\n${inviteLink}`;
@@ -283,36 +301,46 @@ export default function PartyChatScreen() {
                 .filter((m) => m.roomId === selectedRoom.id)
                 .map((msg) => (
                   <View key={msg.id} style={styles.messageWrapper}>
-                    <View style={[
-                      styles.messageBubble,
-                      msg.userId === userId ? styles.myMessageBubble : styles.otherMessageBubble
-                    ]}>
-                      <View style={styles.messageHeader}>
-                        {msg.role === "admin" ? (
-                          <Crown size={14} color="#FFD700" />
-                        ) : (
-                          <UserCircle size={14} color="#00D4FF" />
-                        )}
+                    <View style={styles.messageContainer}>
+                      <View style={[
+                        styles.messageBubble,
+                        msg.userId === userId ? styles.myMessageBubble : styles.otherMessageBubble
+                      ]}>
+                        <View style={styles.messageHeader}>
+                          {msg.role === "admin" ? (
+                            <Crown size={14} color="#FFD700" />
+                          ) : (
+                            <UserCircle size={14} color="#00D4FF" />
+                          )}
+                          <Text style={[
+                            styles.messageUsername,
+                            msg.userId === userId && styles.myMessageUsername
+                          ]}>
+                            {msg.username} {msg.userId === userId ? "(Você)" : ""}
+                          </Text>
+                        </View>
                         <Text style={[
-                          styles.messageUsername,
-                          msg.userId === userId && styles.myMessageUsername
+                          styles.messageText,
+                          msg.userId === userId && styles.myMessageText
+                        ]}>{msg.text}</Text>
+                        <Text style={[
+                          styles.messageTime,
+                          msg.userId === userId && styles.myMessageTime
                         ]}>
-                          {msg.username} {msg.userId === userId ? "(Você)" : ""}
+                          {msg.timestamp.toLocaleTimeString("pt-PT", {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
                         </Text>
                       </View>
-                      <Text style={[
-                        styles.messageText,
-                        msg.userId === userId && styles.myMessageText
-                      ]}>{msg.text}</Text>
-                      <Text style={[
-                        styles.messageTime,
-                        msg.userId === userId && styles.myMessageTime
-                      ]}>
-                        {msg.timestamp.toLocaleTimeString("pt-PT", {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </Text>
+                      {(msg.userId === userId || userRole === "admin") && (
+                        <TouchableOpacity
+                          onPress={() => deleteMessage(msg.id)}
+                          style={styles.deleteMessageButton}
+                        >
+                          <Trash2 size={14} color="#FF3B30" />
+                        </TouchableOpacity>
+                      )}
                     </View>
                   </View>
                 ))
@@ -1020,6 +1048,15 @@ const styles = StyleSheet.create({
   },
   messageWrapper: {
     marginBottom: 12,
+  },
+  messageContainer: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: 6,
+  },
+  deleteMessageButton: {
+    padding: 4,
+    opacity: 0.7,
   },
   messageBubble: {
     padding: 12,

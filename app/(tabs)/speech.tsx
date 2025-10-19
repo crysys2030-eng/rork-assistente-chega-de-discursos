@@ -1,6 +1,6 @@
 import { generateObject } from "@rork/toolkit-sdk";
 import { Stack } from "expo-router";
-import { Sparkles, Loader2, Copy, Check, ExternalLink } from "lucide-react-native";
+import { Sparkles, Loader2, Copy, Check, ExternalLink, Trash2 } from "lucide-react-native";
 import React, { useState } from "react";
 import {
   StyleSheet,
@@ -38,6 +38,7 @@ export default function SpeechScreen() {
   const [sources, setSources] = useState<Array<{ title: string; url: string; relevance: string }>>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [showSpeech, setShowSpeech] = useState(false);
 
   const handleGenerate = async () => {
     if (!formData.topic.trim()) {
@@ -101,6 +102,7 @@ Não inclua títulos ou metadados no discurso, apenas o texto pronto a ser lido.
       
       setGeneratedSpeech(result.speech);
       setSources(result.sources);
+      setShowSpeech(true);
     } catch (error) {
       console.error("Error generating speech:", error);
       Alert.alert("Erro", "Não foi possível gerar o discurso. Tente novamente.");
@@ -113,6 +115,25 @@ Não inclua títulos ou metadados no discurso, apenas o texto pronto a ser lido.
     await Clipboard.setStringAsync(generatedSpeech);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleDeleteSpeech = () => {
+    Alert.alert(
+      "Eliminar Discurso",
+      "Deseja eliminar o discurso gerado?",
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Eliminar",
+          style: "destructive",
+          onPress: () => {
+            setGeneratedSpeech("");
+            setSources([]);
+            setShowSpeech(false);
+          },
+        },
+      ]
+    );
   };
 
   return (
@@ -226,20 +247,28 @@ Não inclua títulos ou metadados no discurso, apenas o texto pronto a ser lido.
               </TouchableOpacity>
             </LinearGradient>
 
-            {generatedSpeech ? (
+            {showSpeech && generatedSpeech ? (
               <View style={styles.resultContainer}>
                 <View style={styles.resultHeader}>
                   <Text style={styles.resultTitle}>Discurso Gerado</Text>
-                  <TouchableOpacity
-                    style={styles.copyButton}
-                    onPress={handleCopy}
-                  >
-                    {copied ? (
-                      <Check size={20} color="#34C759" />
-                    ) : (
-                      <Copy size={20} color="#E94E1B" />
-                    )}
-                  </TouchableOpacity>
+                  <View style={styles.resultActions}>
+                    <TouchableOpacity
+                      style={styles.copyButton}
+                      onPress={handleCopy}
+                    >
+                      {copied ? (
+                        <Check size={20} color="#34C759" />
+                      ) : (
+                        <Copy size={20} color="#00D4FF" />
+                      )}
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.deleteButton}
+                      onPress={handleDeleteSpeech}
+                    >
+                      <Trash2 size={20} color="#FF3B30" />
+                    </TouchableOpacity>
+                  </View>
                 </View>
                 <ScrollView style={styles.speechContainer}>
                   <Text style={styles.speechText}>{generatedSpeech}</Text>
@@ -407,7 +436,14 @@ const styles = StyleSheet.create({
     fontWeight: "700" as const,
     color: "#FFFFFF",
   },
+  resultActions: {
+    flexDirection: "row",
+    gap: 8,
+  },
   copyButton: {
+    padding: 8,
+  },
+  deleteButton: {
     padding: 8,
   },
   speechContainer: {

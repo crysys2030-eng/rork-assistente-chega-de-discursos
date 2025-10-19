@@ -1,6 +1,6 @@
 import { useRorkAgent } from "@rork/toolkit-sdk";
 import { Stack } from "expo-router";
-import { Send, Loader2, Sparkles } from "lucide-react-native";
+import { Send, Loader2, Sparkles, Trash2 } from "lucide-react-native";
 import React, { useState, useRef } from "react";
 import {
   StyleSheet,
@@ -11,6 +11,7 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
@@ -19,7 +20,7 @@ export default function ChatScreen() {
   const [input, setInput] = useState("");
   const scrollViewRef = useRef<ScrollView>(null);
 
-  const { messages, error, sendMessage } = useRorkAgent({
+  const { messages, error, sendMessage, setMessages } = useRorkAgent({
     tools: {},
   });
 
@@ -38,6 +39,40 @@ export default function ChatScreen() {
     }
   };
 
+  const handleDeleteMessage = (messageId: string) => {
+    Alert.alert(
+      "Eliminar Mensagem",
+      "Deseja eliminar esta mensagem?",
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Eliminar",
+          style: "destructive",
+          onPress: () => {
+            setMessages((prev) => prev.filter((m) => m.id !== messageId));
+          },
+        },
+      ]
+    );
+  };
+
+  const handleClearAll = () => {
+    Alert.alert(
+      "Limpar Conversa",
+      "Deseja eliminar todas as mensagens?",
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Limpar",
+          style: "destructive",
+          onPress: () => {
+            setMessages([]);
+          },
+        },
+      ]
+    );
+  };
+
   return (
     <View style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
@@ -52,6 +87,11 @@ export default function ChatScreen() {
             <Text style={styles.headerTitle}>AI Chat</Text>
             <Text style={styles.headerSubtitle}>Assistente inteligente</Text>
           </View>
+          {messages.length > 0 && (
+            <TouchableOpacity onPress={handleClearAll} style={styles.clearButton}>
+              <Trash2 size={20} color="#FF3B30" />
+            </TouchableOpacity>
+          )}
         </View>
         </SafeAreaView>
       </LinearGradient>
@@ -80,33 +120,41 @@ export default function ChatScreen() {
           ) : (
             messages.map((m) => (
               <View key={m.id} style={styles.messageWrapper}>
-                {m.parts.map((part, i) => {
-                  if (part.type === "text") {
-                    return (
-                      <View
-                        key={`${m.id}-${i}`}
-                        style={[
-                          styles.messageBubble,
-                          m.role === "user"
-                            ? styles.userBubble
-                            : styles.assistantBubble,
-                        ]}
-                      >
-                        <Text
+                <View style={styles.messageContainer}>
+                  {m.parts.map((part, i) => {
+                    if (part.type === "text") {
+                      return (
+                        <View
+                          key={`${m.id}-${i}`}
                           style={[
-                            styles.messageText,
+                            styles.messageBubble,
                             m.role === "user"
-                              ? styles.userText
-                              : styles.assistantText,
+                              ? styles.userBubble
+                              : styles.assistantBubble,
                           ]}
                         >
-                          {part.text}
-                        </Text>
-                      </View>
-                    );
-                  }
-                  return null;
-                })}
+                          <Text
+                            style={[
+                              styles.messageText,
+                              m.role === "user"
+                                ? styles.userText
+                                : styles.assistantText,
+                            ]}
+                          >
+                            {part.text}
+                          </Text>
+                        </View>
+                      );
+                    }
+                    return null;
+                  })}
+                  <TouchableOpacity
+                    onPress={() => handleDeleteMessage(m.id)}
+                    style={styles.deleteMessageButton}
+                  >
+                    <Trash2 size={16} color="#FF3B30" />
+                  </TouchableOpacity>
+                </View>
               </View>
             ))
           )}
@@ -171,6 +219,9 @@ const styles = StyleSheet.create({
   headerTextContainer: {
     flex: 1,
   },
+  clearButton: {
+    padding: 8,
+  },
   headerTitle: {
     fontSize: 28,
     fontWeight: "700" as const,
@@ -214,6 +265,15 @@ const styles = StyleSheet.create({
   },
   messageWrapper: {
     marginBottom: 12,
+  },
+  messageContainer: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: 8,
+  },
+  deleteMessageButton: {
+    padding: 4,
+    opacity: 0.6,
   },
   messageBubble: {
     paddingHorizontal: 16,
