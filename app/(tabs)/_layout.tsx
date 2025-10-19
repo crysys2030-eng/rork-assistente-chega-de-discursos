@@ -1,5 +1,5 @@
 import { Tabs } from "expo-router";
-import { Calendar, MessageCircle, Mic, Users, FileText, ListChecks } from "lucide-react-native";
+import { Calendar, MessageCircle, Mic, FileText, ListChecks } from "lucide-react-native";
 import React from "react";
 
 export default function TabLayout() {
@@ -21,13 +21,6 @@ export default function TabLayout() {
         options={{
           title: "Agenda",
           tabBarIcon: ({ color }) => <Calendar color={color} size={24} />,
-        }}
-      />
-      <Tabs.Screen
-        name="party-chat"
-        options={{
-          title: "Chat Partido",
-          tabBarIcon: ({ color }) => <Users color={color} size={24} />,
         }}
       />
       <Tabs.Screen
