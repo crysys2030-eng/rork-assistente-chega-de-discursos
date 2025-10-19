@@ -15,6 +15,7 @@ import {
   Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { LinearGradient } from "expo-linear-gradient";
 
 interface AgendaItem {
   id: string;
@@ -122,20 +123,32 @@ function AgendaScreen() {
   });
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
+    <View style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.headerTitle}>Agenda</Text>
-          <Text style={styles.headerSubtitle}>Reuniões e Discursos</Text>
-        </View>
-        <TouchableOpacity
-          style={styles.addButton}
-          onPress={() => setModalVisible(true)}
-        >
-          <Plus size={24} color="#FFFFFF" />
-        </TouchableOpacity>
-      </View>
+      <LinearGradient
+        colors={["#1a1a2e", "#16213e"]}
+        style={styles.header}
+      >
+        <SafeAreaView edges={["top"]} style={styles.safeArea}>
+          <View style={styles.headerContent}>
+            <View>
+              <Text style={styles.headerTitle}>📅 Agenda</Text>
+              <Text style={styles.headerSubtitle}>Reuniões e Discursos</Text>
+            </View>
+            <LinearGradient
+              colors={["#00D4FF", "#0099CC"]}
+              style={styles.addButton}
+            >
+              <TouchableOpacity
+                onPress={() => setModalVisible(true)}
+                style={styles.addButtonTouchable}
+              >
+                <Plus size={24} color="#FFFFFF" />
+              </TouchableOpacity>
+            </LinearGradient>
+          </View>
+        </SafeAreaView>
+      </LinearGradient>
 
       <ScrollView style={styles.scrollView}>
         {sortedItems.length === 0 ? (
@@ -149,13 +162,17 @@ function AgendaScreen() {
         ) : (
           <View style={styles.itemsList}>
             {sortedItems.map((item) => (
-              <View key={item.id} style={styles.itemCard}>
+              <LinearGradient
+                key={item.id}
+                colors={["#0f3460", "#16213e"]}
+                style={styles.itemCard}
+              >
                 <View style={styles.itemHeader}>
                   <View style={styles.itemTypeIcon}>
                     {item.type === "meeting" ? (
-                      <Users size={20} color="#E94E1B" />
+                      <Users size={20} color="#FFFFFF" />
                     ) : (
-                      <Mic size={20} color="#E94E1B" />
+                      <Mic size={20} color="#FFFFFF" />
                     )}
                   </View>
                   <View style={styles.itemHeaderText}>
@@ -168,7 +185,7 @@ function AgendaScreen() {
                     onPress={() => handleDeleteItem(item.id)}
                     style={styles.deleteButton}
                   >
-                    <Trash2 size={20} color="#8E8E93" />
+                    <Trash2 size={20} color="#FF3B30" />
                   </TouchableOpacity>
                 </View>
                 <View style={styles.itemDetails}>
@@ -182,7 +199,7 @@ function AgendaScreen() {
                     <Text style={styles.itemNotes}>{item.notes}</Text>
                   )}
                 </View>
-              </View>
+              </LinearGradient>
             ))}
           </View>
         )}
@@ -205,40 +222,44 @@ function AgendaScreen() {
 
             <ScrollView style={styles.modalForm}>
               <View style={styles.typeSelector}>
-                <TouchableOpacity
-                  style={[
-                    styles.typeButton,
-                    newItem.type === "meeting" && styles.typeButtonActive,
-                  ]}
-                  onPress={() => setNewItem({ ...newItem, type: "meeting" })}
+                <LinearGradient
+                  colors={newItem.type === "meeting" ? ["#00D4FF", "#0099CC"] : ["#E5E5EA", "#F5F5F7"]}
+                  style={styles.typeButton}
                 >
-                  <Users size={20} color={newItem.type === "meeting" ? "#FFFFFF" : "#000000"} />
-                  <Text
-                    style={[
-                      styles.typeButtonText,
-                      newItem.type === "meeting" && styles.typeButtonTextActive,
-                    ]}
+                  <TouchableOpacity
+                    style={styles.typeButtonInner}
+                    onPress={() => setNewItem({ ...newItem, type: "meeting" })}
                   >
-                    Reunião
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.typeButton,
-                    newItem.type === "speech" && styles.typeButtonActive,
-                  ]}
-                  onPress={() => setNewItem({ ...newItem, type: "speech" })}
+                    <Users size={20} color={newItem.type === "meeting" ? "#FFFFFF" : "#000000"} />
+                    <Text
+                      style={[
+                        styles.typeButtonText,
+                        newItem.type === "meeting" && styles.typeButtonTextActive,
+                      ]}
+                    >
+                      Reunião
+                    </Text>
+                  </TouchableOpacity>
+                </LinearGradient>
+                <LinearGradient
+                  colors={newItem.type === "speech" ? ["#00D4FF", "#0099CC"] : ["#E5E5EA", "#F5F5F7"]}
+                  style={styles.typeButton}
                 >
-                  <Mic size={20} color={newItem.type === "speech" ? "#FFFFFF" : "#000000"} />
-                  <Text
-                    style={[
-                      styles.typeButtonText,
-                      newItem.type === "speech" && styles.typeButtonTextActive,
-                    ]}
+                  <TouchableOpacity
+                    style={styles.typeButtonInner}
+                    onPress={() => setNewItem({ ...newItem, type: "speech" })}
                   >
-                    Discurso
-                  </Text>
-                </TouchableOpacity>
+                    <Mic size={20} color={newItem.type === "speech" ? "#FFFFFF" : "#000000"} />
+                    <Text
+                      style={[
+                        styles.typeButtonText,
+                        newItem.type === "speech" && styles.typeButtonTextActive,
+                      ]}
+                    >
+                      Discurso
+                    </Text>
+                  </TouchableOpacity>
+                </LinearGradient>
               </View>
 
               <View style={styles.formSection}>
@@ -317,7 +338,7 @@ function AgendaScreen() {
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -332,40 +353,47 @@ export default function WrappedAgendaScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F5F5F7",
+    backgroundColor: "#0f0f23",
   },
   header: {
+    paddingBottom: 20,
+  },
+  safeArea: {
     paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 16,
-    backgroundColor: "#FFFFFF",
-    borderBottomWidth: 1,
-    borderBottomColor: "#E5E5EA",
+  },
+  headerContent: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
   },
   headerTitle: {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: "700" as const,
-    color: "#000000",
+    color: "#FFFFFF",
     marginBottom: 4,
   },
   headerSubtitle: {
     fontSize: 15,
-    color: "#8E8E93",
+    color: "#00D4FF",
     fontWeight: "500" as const,
   },
   addButton: {
-    backgroundColor: "#E94E1B",
+    borderRadius: 24,
+    shadowColor: "#00D4FF",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  addButtonTouchable: {
     width: 48,
     height: 48,
-    borderRadius: 24,
     justifyContent: "center",
     alignItems: "center",
   },
   scrollView: {
     flex: 1,
+    backgroundColor: "#0f0f23",
   },
   emptyState: {
     flex: 1,
@@ -377,7 +405,7 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 20,
     fontWeight: "600" as const,
-    color: "#000000",
+    color: "#FFFFFF",
     marginTop: 16,
     marginBottom: 8,
   },
@@ -391,15 +419,14 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   itemCard: {
-    backgroundColor: "#FFFFFF",
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    shadowColor: "#00D4FF",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 5,
   },
   itemHeader: {
     flexDirection: "row",
@@ -410,7 +437,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "#FFF5F2",
+    backgroundColor: "#00D4FF",
     justifyContent: "center",
     alignItems: "center",
     marginRight: 12,
@@ -420,7 +447,7 @@ const styles = StyleSheet.create({
   },
   itemType: {
     fontSize: 13,
-    color: "#E94E1B",
+    color: "#00D4FF",
     fontWeight: "600" as const,
     textTransform: "uppercase",
     marginBottom: 4,
@@ -428,7 +455,7 @@ const styles = StyleSheet.create({
   itemTitle: {
     fontSize: 18,
     fontWeight: "600" as const,
-    color: "#000000",
+    color: "#FFFFFF",
   },
   deleteButton: {
     padding: 4,
@@ -438,7 +465,7 @@ const styles = StyleSheet.create({
   },
   itemDetailText: {
     fontSize: 15,
-    color: "#000000",
+    color: "#FFFFFF",
   },
   itemNotes: {
     fontSize: 14,
@@ -486,19 +513,19 @@ const styles = StyleSheet.create({
   },
   typeButton: {
     flex: 1,
+    borderRadius: 12,
+    shadowColor: "#00D4FF",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  typeButtonInner: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
     paddingVertical: 14,
-    borderRadius: 12,
-    backgroundColor: "#F5F5F7",
-    borderWidth: 2,
-    borderColor: "#E5E5EA",
-  },
-  typeButtonActive: {
-    backgroundColor: "#E94E1B",
-    borderColor: "#E94E1B",
   },
   typeButtonText: {
     fontSize: 16,
@@ -556,7 +583,7 @@ const styles = StyleSheet.create({
     color: "#000000",
   },
   saveButton: {
-    backgroundColor: "#E94E1B",
+    backgroundColor: "#00D4FF",
   },
   saveButtonText: {
     fontSize: 17,

@@ -10,6 +10,12 @@ import {
   Send,
   MoreVertical,
   LogOut,
+  Share2,
+  Crown,
+  UserCircle,
+  Copy,
+  Check,
+  Shield,
 } from "lucide-react-native";
 import React, { useState } from "react";
 import {
@@ -24,8 +30,14 @@ import {
   Modal,
   Switch,
   Alert,
+  Linking,
+  Share,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { LinearGradient } from "expo-linear-gradient";
+import * as Clipboard from "expo-clipboard";
+
+type UserRole = "admin" | "guest";
 
 type ChatRoom = {
   id: string;
@@ -35,6 +47,7 @@ type ChatRoom = {
   encryptionKey: string;
   createdAt: Date;
   isUrgent: boolean;
+  adminId: string;
 };
 
 type Message = {
@@ -43,6 +56,8 @@ type Message = {
   text: string;
   username: string;
   timestamp: Date;
+  userId: string;
+  role: UserRole;
 };
 
 export default function PartyChatScreen() {
@@ -52,6 +67,9 @@ export default function PartyChatScreen() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [username, setUsername] = useState("Membro");
+  const [userId] = useState(`user_${Date.now()}`);
+  const [userRole, setUserRole] = useState<UserRole>("guest");
+  const [copiedKey, setCopiedKey] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [showRoomSettings, setShowRoomSettings] = useState(false);
@@ -86,6 +104,7 @@ export default function PartyChatScreen() {
       encryptionKey: newRoomKey,
       createdAt: new Date(),
       isUrgent: newRoomIsUrgent,
+      adminId: userId,
     };
 
     setRooms([...rooms, newRoom]);
@@ -103,6 +122,8 @@ export default function PartyChatScreen() {
       return;
     }
 
+    const isAdmin = room.adminId === userId;
+    setUserRole(isAdmin ? "admin" : "guest");
     setSelectedRoom(room);
     setJoinRoomKey("");
     setShowJoinModal(false);
@@ -130,10 +151,52 @@ export default function PartyChatScreen() {
       text: input,
       username: username,
       timestamp: new Date(),
+      userId: userId,
+      role: userRole,
     };
 
     setMessages([...messages, newMessage]);
     setInput("");
+  };
+
+  const shareToWhatsApp = async (room: ChatRoom) => {
+    const inviteLink = `chega://room/${room.id}`;
+    const message = `🔐 *Convite para Sala do Partido Chega*\n\n📌 *Sala:* ${room.name}\n🔑 *Código:* ${room.encryptionKey}\n\nEntre na aplicação e use o código acima para aceder.\n\n${inviteLink}`;
+
+    const whatsappUrl = `whatsapp://send?text=${encodeURIComponent(message)}`;
+
+    try {
+      const canOpen = await Linking.canOpenURL(whatsappUrl);
+      if (canOpen) {
+        await Linking.openURL(whatsappUrl);
+      } else {
+        await Share.share({
+          message: message,
+          title: `Convite: ${room.name}`,
+        });
+      }
+    } catch (error) {
+      Alert.alert(
+        "Partilhar Convite",
+        `Sala: ${room.name}\nCódigo: ${room.encryptionKey}`,
+        [
+          {
+            text: "Copiar Código",
+            onPress: async () => {
+              await Clipboard.setStringAsync(room.encryptionKey);
+              Alert.alert("Copiado", "Código copiado para a área de transferência");
+            },
+          },
+          { text: "Fechar", style: "cancel" },
+        ]
+      );
+    }
+  };
+
+  const copyKey = async (key: string) => {
+    await Clipboard.setStringAsync(key);
+    setCopiedKey(true);
+    setTimeout(() => setCopiedKey(false), 2000);
   };
 
   const deleteRoom = (roomId: string) => {
@@ -161,35 +224,40 @@ export default function PartyChatScreen() {
     return (
       <View style={styles.container}>
         <Stack.Screen options={{ headerShown: false }} />
-        <View style={[styles.chatHeader, { paddingTop: insets.top + 16 }]}>
-          <TouchableOpacity onPress={leaveRoom} style={styles.backButton}>
-            <Text style={styles.backText}>← Voltar</Text>
-          </TouchableOpacity>
-          <View style={styles.chatHeaderInfo}>
-            <View style={styles.roomHeaderRow}>
-              <Text style={styles.chatHeaderTitle}>{selectedRoom.name}</Text>
-              {selectedRoom.isUrgent && (
-                <View style={styles.urgentBadge}>
-                  <Text style={styles.urgentText}>URGENTE</Text>
-                </View>
-              )}
+        <LinearGradient
+          colors={["#1a1a2e", "#16213e"]}
+          style={[styles.chatHeader, { paddingTop: insets.top + 16 }]}
+        >
+          <View style={styles.headerContent}>
+            <TouchableOpacity onPress={leaveRoom} style={styles.backButton}>
+              <Text style={styles.backText}>← Voltar</Text>
+            </TouchableOpacity>
+            <View style={styles.chatHeaderInfo}>
+              <View style={styles.roomHeaderRow}>
+                <Text style={styles.chatHeaderTitle}>{selectedRoom.name}</Text>
+                {selectedRoom.isUrgent && (
+                  <View style={styles.urgentBadge}>
+                    <Text style={styles.urgentText}>🚨 URGENTE</Text>
+                  </View>
+                )}
+              </View>
+              <View style={styles.roomInfoRow}>
+                {userRole === "admin" ? (
+                  <Crown size={14} color="#FFD700" />
+                ) : (
+                  <UserCircle size={14} color="#00D4FF" />
+                )}
+                <Text style={styles.chatHeaderSubtitle}>
+                  {userRole === "admin" ? "Admin" : "Convidado"} •{" "}
+                  {selectedRoom.isPrivate ? "Privada" : "Pública"}
+                </Text>
+              </View>
             </View>
-            <View style={styles.roomInfoRow}>
-              {selectedRoom.isPrivate ? (
-                <Lock size={14} color="#8E8E93" />
-              ) : (
-                <Unlock size={14} color="#8E8E93" />
-              )}
-              <Text style={styles.chatHeaderSubtitle}>
-                {selectedRoom.isPrivate ? "Privada" : "Pública"} •{" "}
-                {selectedRoom.isActive ? "Ativa" : "Inativa"}
-              </Text>
-            </View>
+            <TouchableOpacity onPress={() => setShowRoomSettings(true)}>
+              <MoreVertical size={24} color="#00D4FF" />
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity onPress={() => setShowRoomSettings(true)}>
-            <MoreVertical size={24} color="#E94E1B" />
-          </TouchableOpacity>
-        </View>
+        </LinearGradient>
 
         <KeyboardAvoidingView
           style={styles.keyboardView}
@@ -216,12 +284,31 @@ export default function PartyChatScreen() {
                 .filter((m) => m.roomId === selectedRoom.id)
                 .map((msg) => (
                   <View key={msg.id} style={styles.messageWrapper}>
-                    <View style={styles.messageBubble}>
-                      <Text style={styles.messageUsername}>
-                        {msg.username}
-                      </Text>
-                      <Text style={styles.messageText}>{msg.text}</Text>
-                      <Text style={styles.messageTime}>
+                    <View style={[
+                      styles.messageBubble,
+                      msg.userId === userId ? styles.myMessageBubble : styles.otherMessageBubble
+                    ]}>
+                      <View style={styles.messageHeader}>
+                        {msg.role === "admin" ? (
+                          <Crown size={14} color="#FFD700" />
+                        ) : (
+                          <UserCircle size={14} color="#00D4FF" />
+                        )}
+                        <Text style={[
+                          styles.messageUsername,
+                          msg.userId === userId && styles.myMessageUsername
+                        ]}>
+                          {msg.username} {msg.userId === userId ? "(Você)" : ""}
+                        </Text>
+                      </View>
+                      <Text style={[
+                        styles.messageText,
+                        msg.userId === userId && styles.myMessageText
+                      ]}>{msg.text}</Text>
+                      <Text style={[
+                        styles.messageTime,
+                        msg.userId === userId && styles.myMessageTime
+                      ]}>
                         {msg.timestamp.toLocaleTimeString("pt-PT", {
                           hour: "2-digit",
                           minute: "2-digit",
@@ -279,24 +366,66 @@ export default function PartyChatScreen() {
 
               <View style={styles.settingRow}>
                 <Text style={styles.settingLabel}>Chave de Encriptação</Text>
-                <View style={styles.keyDisplay}>
+                <TouchableOpacity
+                  style={styles.keyDisplay}
+                  onPress={() => copyKey(selectedRoom.encryptionKey)}
+                >
                   <Key size={16} color="#E94E1B" />
                   <Text style={styles.keyText}>{selectedRoom.encryptionKey}</Text>
-                </View>
+                  {copiedKey ? (
+                    <Check size={16} color="#34C759" />
+                  ) : (
+                    <Copy size={16} color="#8E8E93" />
+                  )}
+                </TouchableOpacity>
               </View>
 
+              {userRole === "admin" && (
+                <View style={styles.settingRow}>
+                  <Text style={styles.settingLabel}>Partilhar Sala</Text>
+                  <TouchableOpacity
+                    style={styles.shareButton}
+                    onPress={() => shareToWhatsApp(selectedRoom)}
+                  >
+                    <Share2 size={18} color="#FFFFFF" />
+                    <Text style={styles.shareButtonText}>
+                      Enviar Convite via WhatsApp
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {userRole === "admin" && (
+                <View style={styles.settingRow}>
+                  <Text style={styles.settingLabel}>Estado da Sala (Admin)</Text>
+                  <View style={styles.statusRow}>
+                    <Text style={styles.statusText}>
+                      {selectedRoom.isActive ? "Ativa" : "Inativa"}
+                    </Text>
+                    <Switch
+                      value={selectedRoom.isActive}
+                      onValueChange={() => toggleRoomStatus(selectedRoom.id)}
+                      trackColor={{ false: "#C7C7CC", true: "#00D4FF" }}
+                      thumbColor="#FFFFFF"
+                    />
+                  </View>
+                </View>
+              )}
+
               <View style={styles.settingRow}>
-                <Text style={styles.settingLabel}>Estado da Sala</Text>
-                <View style={styles.statusRow}>
-                  <Text style={styles.statusText}>
-                    {selectedRoom.isActive ? "Ativa" : "Inativa"}
-                  </Text>
-                  <Switch
-                    value={selectedRoom.isActive}
-                    onValueChange={() => toggleRoomStatus(selectedRoom.id)}
-                    trackColor={{ false: "#C7C7CC", true: "#E94E1B" }}
-                    thumbColor="#FFFFFF"
-                  />
+                <Text style={styles.settingLabel}>Seu Papel na Sala</Text>
+                <View style={styles.roleDisplay}>
+                  {userRole === "admin" ? (
+                    <>
+                      <Shield size={20} color="#FFD700" />
+                      <Text style={styles.roleText}>Administrador</Text>
+                    </>
+                  ) : (
+                    <>
+                      <UserCircle size={20} color="#00D4FF" />
+                      <Text style={styles.roleText}>Convidado</Text>
+                    </>
+                  )}
                 </View>
               </View>
 
@@ -311,15 +440,17 @@ export default function PartyChatScreen() {
                 <Text style={styles.leaveButtonText}>Sair da Sala</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity
-                style={styles.deleteButton}
-                onPress={() => {
-                  setShowRoomSettings(false);
-                  deleteRoom(selectedRoom.id);
-                }}
-              >
-                <Text style={styles.deleteButtonText}>Eliminar Sala</Text>
-              </TouchableOpacity>
+              {userRole === "admin" && (
+                <TouchableOpacity
+                  style={styles.deleteButton}
+                  onPress={() => {
+                    setShowRoomSettings(false);
+                    deleteRoom(selectedRoom.id);
+                  }}
+                >
+                  <Text style={styles.deleteButtonText}>Eliminar Sala</Text>
+                </TouchableOpacity>
+              )}
 
               <TouchableOpacity
                 style={styles.closeButton}
@@ -337,12 +468,17 @@ export default function PartyChatScreen() {
   return (
     <View style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
-      <View style={[styles.header, { paddingTop: insets.top + 20 }]}>
-        <Text style={styles.headerTitle}>Chat do Partido</Text>
-        <Text style={styles.headerSubtitle}>
-          Comunicação segura para urgências
-        </Text>
-      </View>
+      <LinearGradient
+        colors={["#1a1a2e", "#16213e"]}
+        style={[styles.header, { paddingTop: insets.top + 20 }]}
+      >
+        <View>
+          <Text style={styles.headerTitle}>🛡️ Chat do Partido</Text>
+          <Text style={styles.headerSubtitle}>
+            Comunicação segura e encriptada
+          </Text>
+        </View>
+      </LinearGradient>
 
       <ScrollView style={styles.roomsList}>
         {rooms.length === 0 ? (
@@ -355,21 +491,28 @@ export default function PartyChatScreen() {
           </View>
         ) : (
           rooms.map((room) => (
-            <TouchableOpacity
+            <LinearGradient
               key={room.id}
+              colors={["#0f3460", "#16213e"]}
               style={styles.roomCard}
-              onPress={() => {
-                setRoomToJoin(room);
-                setShowJoinModal(true);
-              }}
             >
-              <View style={styles.roomIcon}>
+              <TouchableOpacity
+                style={styles.roomCardTouchable}
+                onPress={() => {
+                  setRoomToJoin(room);
+                  setShowJoinModal(true);
+                }}
+              >
+              <LinearGradient
+                colors={room.isPrivate ? ["#FF6B6B", "#E94E1B"] : ["#00D4FF", "#0099CC"]}
+                style={styles.roomIcon}
+              >
                 {room.isPrivate ? (
-                  <Lock size={24} color="#E94E1B" />
+                  <Lock size={24} color="#FFFFFF" />
                 ) : (
-                  <Unlock size={24} color="#8E8E93" />
+                  <Unlock size={24} color="#FFFFFF" />
                 )}
-              </View>
+              </LinearGradient>
               <View style={styles.roomInfo}>
                 <View style={styles.roomNameRow}>
                   <Text style={styles.roomName}>{room.name}</Text>
@@ -395,20 +538,26 @@ export default function PartyChatScreen() {
                 </View>
               </View>
               <View style={styles.roomKeyIcon}>
-                <Key size={20} color="#C7C7CC" />
+                <Key size={20} color="#00D4FF" />
               </View>
-            </TouchableOpacity>
+              </TouchableOpacity>
+            </LinearGradient>
           ))
         )}
       </ScrollView>
 
-      <TouchableOpacity
+      <LinearGradient
+        colors={["#00D4FF", "#0099CC"]}
         style={styles.createButton}
-        onPress={() => setShowCreateModal(true)}
       >
-        <Plus size={24} color="#FFFFFF" />
-        <Text style={styles.createButtonText}>Criar Nova Sala</Text>
-      </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.createButtonTouchable}
+          onPress={() => setShowCreateModal(true)}
+        >
+          <Plus size={24} color="#FFFFFF" />
+          <Text style={styles.createButtonText}>Criar Nova Sala</Text>
+        </TouchableOpacity>
+      </LinearGradient>
 
       <Modal
         visible={showCreateModal}
@@ -547,29 +696,27 @@ export default function PartyChatScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F5F5F7",
+    backgroundColor: "#0f0f23",
   },
   header: {
     paddingHorizontal: 20,
-    paddingBottom: 16,
-    backgroundColor: "#FFFFFF",
-    borderBottomWidth: 1,
-    borderBottomColor: "#E5E5EA",
+    paddingBottom: 20,
   },
   headerTitle: {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: "700" as const,
-    color: "#000000",
+    color: "#FFFFFF",
     marginBottom: 4,
   },
   headerSubtitle: {
     fontSize: 15,
-    color: "#8E8E93",
+    color: "#00D4FF",
     fontWeight: "500" as const,
   },
   roomsList: {
     flex: 1,
     padding: 16,
+    backgroundColor: "#0f0f23",
   },
   emptyRooms: {
     alignItems: "center",
@@ -579,7 +726,7 @@ const styles = StyleSheet.create({
   emptyRoomsTitle: {
     fontSize: 24,
     fontWeight: "700" as const,
-    color: "#000000",
+    color: "#FFFFFF",
     marginTop: 16,
     marginBottom: 8,
   },
@@ -588,24 +735,25 @@ const styles = StyleSheet.create({
     color: "#8E8E93",
     textAlign: "center",
   },
-  roomCard: {
+  roomCardTouchable: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
+    flex: 1,
+  },
+  roomCard: {
     padding: 16,
-    borderRadius: 12,
+    borderRadius: 16,
     marginBottom: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    shadowColor: "#00D4FF",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 5,
   },
   roomIcon: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: "#F5F5F7",
     justifyContent: "center",
     alignItems: "center",
     marginRight: 12,
@@ -622,7 +770,7 @@ const styles = StyleSheet.create({
   roomName: {
     fontSize: 17,
     fontWeight: "600" as const,
-    color: "#000000",
+    color: "#FFFFFF",
   },
   roomMeta: {
     flexDirection: "row",
@@ -642,7 +790,7 @@ const styles = StyleSheet.create({
   },
   roomMetaText: {
     fontSize: 14,
-    color: "#8E8E93",
+    color: "#00D4FF",
   },
   roomKeyIcon: {
     marginLeft: 8,
@@ -659,19 +807,25 @@ const styles = StyleSheet.create({
     fontWeight: "700" as const,
   },
   createButton: {
+    margin: 16,
+    borderRadius: 16,
+    shadowColor: "#00D4FF",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  createButtonTouchable: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#E94E1B",
-    margin: 16,
-    padding: 16,
-    borderRadius: 12,
+    padding: 18,
     gap: 8,
   },
   createButtonText: {
     color: "#FFFFFF",
     fontSize: 17,
-    fontWeight: "600" as const,
+    fontWeight: "700" as const,
   },
   modalOverlay: {
     flex: 1,
@@ -791,21 +945,20 @@ const styles = StyleSheet.create({
     fontWeight: "500" as const,
   },
   chatHeader: {
-    flexDirection: "row",
-    alignItems: "center",
     paddingHorizontal: 20,
     paddingBottom: 16,
-    backgroundColor: "#FFFFFF",
-    borderBottomWidth: 1,
-    borderBottomColor: "#E5E5EA",
+  },
+  headerContent: {
+    flexDirection: "row",
+    alignItems: "center",
   },
   backButton: {
     marginRight: 12,
   },
   backText: {
     fontSize: 17,
-    color: "#E94E1B",
-    fontWeight: "500" as const,
+    color: "#00D4FF",
+    fontWeight: "600" as const,
   },
   chatHeaderInfo: {
     flex: 1,
@@ -819,7 +972,7 @@ const styles = StyleSheet.create({
   chatHeaderTitle: {
     fontSize: 18,
     fontWeight: "700" as const,
-    color: "#000000",
+    color: "#FFFFFF",
   },
   urgentBadge: {
     backgroundColor: "#FF3B30",
@@ -839,7 +992,7 @@ const styles = StyleSheet.create({
   },
   chatHeaderSubtitle: {
     fontSize: 14,
-    color: "#8E8E93",
+    color: "#00D4FF",
   },
   keyboardView: {
     flex: 1,
@@ -871,30 +1024,53 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   messageBubble: {
-    backgroundColor: "#FFFFFF",
     padding: 12,
-    borderRadius: 12,
+    borderRadius: 16,
+    maxWidth: "80%",
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
     shadowRadius: 4,
-    elevation: 1,
+    elevation: 2,
+  },
+  myMessageBubble: {
+    backgroundColor: "#00D4FF",
+    alignSelf: "flex-end",
+  },
+  otherMessageBubble: {
+    backgroundColor: "#1e1e3f",
+    alignSelf: "flex-start",
+  },
+  messageHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 6,
   },
   messageUsername: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: "700" as const,
-    color: "#E94E1B",
-    marginBottom: 4,
+    color: "#FFFFFF",
+  },
+  myMessageUsername: {
+    color: "#0f0f23",
   },
   messageText: {
     fontSize: 16,
-    color: "#000000",
+    color: "#FFFFFF",
     lineHeight: 22,
     marginBottom: 4,
   },
+  myMessageText: {
+    color: "#0f0f23",
+  },
   messageTime: {
-    fontSize: 12,
-    color: "#8E8E93",
+    fontSize: 11,
+    color: "#B0B0B0",
+    alignSelf: "flex-end",
+  },
+  myMessageTime: {
+    color: "rgba(15, 15, 35, 0.6)",
   },
   inputContainer: {
     flexDirection: "row",
@@ -955,6 +1131,33 @@ const styles = StyleSheet.create({
     fontWeight: "600" as const,
     color: "#E94E1B",
     flex: 1,
+  },
+  shareButton: {
+    backgroundColor: "#25D366",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 14,
+    borderRadius: 12,
+    gap: 8,
+  },
+  shareButtonText: {
+    color: "#FFFFFF",
+    fontSize: 15,
+    fontWeight: "600" as const,
+  },
+  roleDisplay: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: "#F5F5F7",
+    padding: 14,
+    borderRadius: 12,
+  },
+  roleText: {
+    fontSize: 16,
+    fontWeight: "600" as const,
+    color: "#000000",
   },
   statusRow: {
     flexDirection: "row",

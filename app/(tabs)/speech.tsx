@@ -17,6 +17,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as Clipboard from "expo-clipboard";
 import { z } from "zod";
+import { LinearGradient } from "expo-linear-gradient";
 
 interface SpeechFormData {
   topic: string;
@@ -115,12 +116,17 @@ Não inclua títulos ou metadados no discurso, apenas o texto pronto a ser lido.
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
+    <View style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Preparação de Discursos</Text>
-        <Text style={styles.headerSubtitle}>Discursos alinhados com o Chega</Text>
-      </View>
+      <LinearGradient
+        colors={["#1a1a2e", "#16213e"]}
+        style={styles.header}
+      >
+        <SafeAreaView edges={["top"]} style={styles.safeArea}>
+        <Text style={styles.headerTitle}>🎯 Preparação de Discursos</Text>
+        <Text style={styles.headerSubtitle}>IA alinhada com o Chega</Text>
+        </SafeAreaView>
+      </LinearGradient>
 
       <KeyboardAvoidingView
         style={styles.keyboardView}
@@ -197,23 +203,28 @@ Não inclua títulos ou metadados no discurso, apenas o texto pronto a ser lido.
               />
             </View>
 
-            <TouchableOpacity
-              style={[styles.generateButton, isGenerating && styles.buttonDisabled]}
-              onPress={handleGenerate}
-              disabled={isGenerating}
+            <LinearGradient
+              colors={isGenerating ? ["#C7C7CC", "#8E8E93"] : ["#00D4FF", "#0099CC"]}
+              style={styles.generateButton}
             >
-              {isGenerating ? (
-                <>
-                  <Loader2 size={20} color="#FFFFFF" />
-                  <Text style={styles.generateButtonText}>A gerar...</Text>
-                </>
-              ) : (
-                <>
-                  <Sparkles size={20} color="#FFFFFF" />
-                  <Text style={styles.generateButtonText}>Gerar Discurso</Text>
-                </>
-              )}
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.generateButtonInner}
+                onPress={handleGenerate}
+                disabled={isGenerating}
+              >
+                {isGenerating ? (
+                  <>
+                    <Loader2 size={20} color="#FFFFFF" />
+                    <Text style={styles.generateButtonText}>A gerar...</Text>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles size={20} color="#FFFFFF" />
+                    <Text style={styles.generateButtonText}>Gerar Discurso</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </LinearGradient>
 
             {generatedSpeech ? (
               <View style={styles.resultContainer}>
@@ -241,15 +252,19 @@ Não inclua títulos ou metadados no discurso, apenas o texto pronto a ser lido.
                       Fontes verificáveis que comprovam os factos mencionados
                     </Text>
                     {sources.map((source, index) => (
-                      <TouchableOpacity
+                      <LinearGradient
                         key={index}
+                        colors={["#0f3460", "#16213e"]}
                         style={styles.sourceCard}
-                        onPress={() => {
-                          Linking.openURL(source.url).catch(() => {
-                            Alert.alert("Erro", "Não foi possível abrir o link.");
-                          });
-                        }}
                       >
+                        <TouchableOpacity
+                          style={styles.sourceCardInner}
+                          onPress={() => {
+                            Linking.openURL(source.url).catch(() => {
+                              Alert.alert("Erro", "Não foi possível abrir o link.");
+                            });
+                          }}
+                        >
                         <View style={styles.sourceHeader}>
                           <Text style={styles.sourceNumber}>{index + 1}</Text>
                           <View style={styles.sourceContent}>
@@ -265,7 +280,8 @@ Não inclua títulos ou metadados no discurso, apenas o texto pronto a ser lido.
                             </View>
                           </View>
                         </View>
-                      </TouchableOpacity>
+                        </TouchableOpacity>
+                      </LinearGradient>
                     ))}
                   </View>
                 )}
@@ -274,32 +290,30 @@ Não inclua títulos ou metadados no discurso, apenas o texto pronto a ser lido.
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F5F5F7",
+    backgroundColor: "#0f0f23",
   },
   header: {
+    paddingBottom: 20,
+  },
+  safeArea: {
     paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 16,
-    backgroundColor: "#FFFFFF",
-    borderBottomWidth: 1,
-    borderBottomColor: "#E5E5EA",
   },
   headerTitle: {
-    fontSize: 32,
+    fontSize: 26,
     fontWeight: "700" as const,
-    color: "#000000",
+    color: "#FFFFFF",
     marginBottom: 4,
   },
   headerSubtitle: {
     fontSize: 15,
-    color: "#8E8E93",
+    color: "#00D4FF",
     fontWeight: "500" as const,
   },
   keyboardView: {
@@ -307,6 +321,7 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+    backgroundColor: "#0f0f23",
   },
   formContainer: {
     padding: 16,
@@ -358,22 +373,25 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
   },
   generateButton: {
-    backgroundColor: "#E94E1B",
-    paddingVertical: 16,
-    borderRadius: 12,
+    borderRadius: 16,
+    marginTop: 8,
+    shadowColor: "#00D4FF",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  generateButtonInner: {
+    paddingVertical: 18,
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
     gap: 8,
-    marginTop: 8,
-  },
-  buttonDisabled: {
-    backgroundColor: "#C7C7CC",
   },
   generateButtonText: {
     color: "#FFFFFF",
     fontSize: 17,
-    fontWeight: "600" as const,
+    fontWeight: "700" as const,
   },
   resultContainer: {
     marginTop: 8,
@@ -421,12 +439,16 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   sourceCard: {
-    backgroundColor: "#FFFFFF",
     borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: "#E5E5EA",
     marginBottom: 8,
+    shadowColor: "#00D4FF",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  sourceCardInner: {
+    padding: 16,
   },
   sourceHeader: {
     flexDirection: "row",
@@ -450,12 +472,12 @@ const styles = StyleSheet.create({
   sourceTitle: {
     fontSize: 16,
     fontWeight: "600" as const,
-    color: "#000000",
+    color: "#FFFFFF",
     lineHeight: 22,
   },
   sourceRelevance: {
     fontSize: 14,
-    color: "#000000",
+    color: "#FFFFFF",
     lineHeight: 20,
   },
   sourceUrlContainer: {
@@ -467,7 +489,7 @@ const styles = StyleSheet.create({
   sourceUrl: {
     flex: 1,
     fontSize: 13,
-    color: "#E94E1B",
+    color: "#00D4FF",
     fontWeight: "500" as const,
   },
 });

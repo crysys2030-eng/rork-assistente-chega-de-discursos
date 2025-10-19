@@ -1,6 +1,6 @@
 import { useRorkAgent } from "@rork/toolkit-sdk";
 import { Stack } from "expo-router";
-import { Send, Loader2 } from "lucide-react-native";
+import { Send, Loader2, Sparkles } from "lucide-react-native";
 import React, { useState, useRef } from "react";
 import {
   StyleSheet,
@@ -13,6 +13,7 @@ import {
   Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { LinearGradient } from "expo-linear-gradient";
 
 export default function ChatScreen() {
   const [input, setInput] = useState("");
@@ -38,12 +39,22 @@ export default function ChatScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
+    <View style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>AI Chat</Text>
-        <Text style={styles.headerSubtitle}>Pergunte o que quiser</Text>
-      </View>
+      <LinearGradient
+        colors={["#1a1a2e", "#16213e"]}
+        style={styles.header}
+      >
+        <SafeAreaView edges={["top"]} style={styles.safeArea}>
+        <View style={styles.headerContent}>
+          <Sparkles size={28} color="#00D4FF" />
+          <View style={styles.headerTextContainer}>
+            <Text style={styles.headerTitle}>AI Chat</Text>
+            <Text style={styles.headerSubtitle}>Assistente inteligente</Text>
+          </View>
+        </View>
+        </SafeAreaView>
+      </LinearGradient>
 
       <KeyboardAvoidingView
         style={styles.keyboardView}
@@ -60,6 +71,7 @@ export default function ChatScreen() {
         >
           {messages.length === 0 ? (
             <View style={styles.emptyState}>
+              <Sparkles size={64} color="#00D4FF" />
               <Text style={styles.emptyTitle}>Olá! 👋</Text>
               <Text style={styles.emptySubtitle}>
                 Faça qualquer pergunta e eu ajudo-o com a resposta.
@@ -100,7 +112,7 @@ export default function ChatScreen() {
           )}
           {messages.length > 0 && messages[messages.length - 1]?.role === "assistant" && messages[messages.length - 1]?.parts.length === 0 && (
             <View style={styles.loadingContainer}>
-              <Loader2 size={20} color="#E94E1B" />
+              <Loader2 size={20} color="#00D4FF" />
               <Text style={styles.loadingText}>A pensar...</Text>
             </View>
           )}
@@ -122,44 +134,52 @@ export default function ChatScreen() {
             maxLength={1000}
             editable={true}
           />
-          <TouchableOpacity
-            style={[
-              styles.sendButton,
-              !input.trim() && styles.sendButtonDisabled,
-            ]}
-            onPress={handleSend}
-            disabled={!input.trim()}
+          <LinearGradient
+            colors={!input.trim() ? ["#C7C7CC", "#8E8E93"] : ["#00D4FF", "#0099CC"]}
+            style={styles.sendButton}
           >
-            <Send size={20} color="#FFFFFF" />
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.sendButtonInner}
+              onPress={handleSend}
+              disabled={!input.trim()}
+            >
+              <Send size={20} color="#FFFFFF" />
+            </TouchableOpacity>
+          </LinearGradient>
         </View>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F5F5F7",
+    backgroundColor: "#0f0f23",
   },
   header: {
+    paddingBottom: 20,
+  },
+  safeArea: {
     paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 16,
-    backgroundColor: "#FFFFFF",
-    borderBottomWidth: 1,
-    borderBottomColor: "#E5E5EA",
+  },
+  headerContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  headerTextContainer: {
+    flex: 1,
   },
   headerTitle: {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: "700" as const,
-    color: "#000000",
+    color: "#FFFFFF",
     marginBottom: 4,
   },
   headerSubtitle: {
     fontSize: 15,
-    color: "#8E8E93",
+    color: "#00D4FF",
     fontWeight: "500" as const,
   },
   keyboardView: {
@@ -167,6 +187,7 @@ const styles = StyleSheet.create({
   },
   messagesContainer: {
     flex: 1,
+    backgroundColor: "#0f0f23",
   },
   messagesContent: {
     padding: 16,
@@ -182,6 +203,8 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 32,
     marginBottom: 12,
+    color: "#FFFFFF",
+    marginTop: 16,
   },
   emptySubtitle: {
     fontSize: 17,
@@ -199,29 +222,29 @@ const styles = StyleSheet.create({
     maxWidth: "80%",
   },
   userBubble: {
-    backgroundColor: "#E94E1B",
+    backgroundColor: "#00D4FF",
     alignSelf: "flex-end",
     marginLeft: "20%",
   },
   assistantBubble: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#1e1e3f",
     alignSelf: "flex-start",
     marginRight: "20%",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
+    shadowColor: "#00D4FF",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
     shadowRadius: 4,
-    elevation: 1,
+    elevation: 2,
   },
   messageText: {
     fontSize: 16,
     lineHeight: 22,
   },
   userText: {
-    color: "#FFFFFF",
+    color: "#0f0f23",
   },
   assistantText: {
-    color: "#000000",
+    color: "#FFFFFF",
   },
   loadingContainer: {
     flexDirection: "row",
@@ -229,14 +252,14 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#1e1e3f",
     alignSelf: "flex-start",
     borderRadius: 20,
     marginRight: "20%",
   },
   loadingText: {
     fontSize: 15,
-    color: "#8E8E93",
+    color: "#00D4FF",
   },
   errorContainer: {
     backgroundColor: "#FFE5E5",
@@ -268,14 +291,17 @@ const styles = StyleSheet.create({
     maxHeight: 100,
   },
   sendButton: {
-    backgroundColor: "#E94E1B",
+    borderRadius: 22,
+    shadowColor: "#00D4FF",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  sendButtonInner: {
     width: 44,
     height: 44,
-    borderRadius: 22,
     justifyContent: "center",
     alignItems: "center",
-  },
-  sendButtonDisabled: {
-    backgroundColor: "#C7C7CC",
   },
 });
