@@ -61,7 +61,12 @@ const [MinutesContext, useMinutes] = createContextHook(() => {
     queryKey: ["minutes"],
     queryFn: async () => {
       const stored = await AsyncStorage.getItem("minutes");
-      return stored ? JSON.parse(stored) : [];
+      if (!stored) return [];
+      const parsed = JSON.parse(stored);
+      return parsed.map((m: Minute) => ({
+        ...m,
+        createdAt: new Date(m.createdAt),
+      }));
     },
   });
 
@@ -267,7 +272,11 @@ Contexto: Reunião do partido político Chega em Portugal.`;
         ) : (
           <View style={styles.minutesList}>
             {minutes
-              .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+              .sort((a, b) => {
+                const timeA = a.createdAt instanceof Date ? a.createdAt.getTime() : new Date(a.createdAt).getTime();
+                const timeB = b.createdAt instanceof Date ? b.createdAt.getTime() : new Date(b.createdAt).getTime();
+                return timeB - timeA;
+              })
               .map((minute) => (
                 <LinearGradient
                   key={minute.id}
