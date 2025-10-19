@@ -18,6 +18,8 @@ import {
   Shield,
   Trash2,
   QrCode,
+  Camera as CameraIcon,
+  X,
 } from "lucide-react-native";
 import React, { useState, useEffect, useRef } from "react";
 import {
@@ -34,10 +36,12 @@ import {
   Alert,
   Linking,
   Share,
+  Image,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Clipboard from "expo-clipboard";
+import { CameraView, useCameraPermissions } from "expo-camera";
 
 type UserRole = "admin" | "guest";
 
@@ -79,7 +83,10 @@ export default function PartyChatScreen() {
   const [showRoomSettings, setShowRoomSettings] = useState(false);
   const [showQRModal, setShowQRModal] = useState(false);
   const [qrCodeData, setQrCodeData] = useState("");
+  const [qrImageUrl, setQrImageUrl] = useState("");
+  const [showScanner, setShowScanner] = useState(false);
   const [roomToJoin, setRoomToJoin] = useState<ChatRoom | null>(null);
+  const [permission, requestPermission] = useCameraPermissions();
 
   const [newRoomName, setNewRoomName] = useState("");
   const [newRoomKey, setNewRoomKey] = useState("");
@@ -201,7 +208,6 @@ export default function PartyChatScreen() {
 
   const shareToWhatsApp = async (room: ChatRoom) => {
     const appLink = `exp://192.168.1.100:8081/--/party-chat?roomId=${room.id}&key=${encodeURIComponent(room.encryptionKey)}`;
-    const webLink = `https://suaapp.com/party-chat?roomId=${room.id}&key=${encodeURIComponent(room.encryptionKey)}`;
     
     const message = `🔐 *Convite para Sala do Partido Chega*\n\n📌 *Sala:* ${room.name}\n🔑 *Código:* ${room.encryptionKey}\n\n🔗 *Link de Acesso:*\n${appLink}\n\nClique no link ou abra a aplicação e use o código acima para aceder.`;
 
@@ -227,14 +233,108 @@ export default function PartyChatScreen() {
   };
 
   const showQRCode = (room: ChatRoom) => {
+    const appLink = `exp://192.168.1.100:8081/--/party-chat?roomId=${room.id}&key=${encodeURIComponent(room.encryptionKey)}&username=${encodeURIComponent(username)}`;
+    
     const qrData = JSON.stringify({
       roomId: room.id,
       roomName: room.name,
       key: room.encryptionKey,
+      link: appLink,
       type: "chega-room-invite"
     });
+    
     setQrCodeData(qrData);
+    
+    const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(appLink)}`;
+    setQrImageUrl(qrApiUrl);
+    
     setShowQRModal(true);
+  };
+
+  const handleBarCodeScanned = async ({ data }: { data: string }) => {
+    try {
+      setShowScanner(false);
+      
+      let parsedData;
+      try {
+        parsedData = JSON.parse(data);
+      } catch {
+        if (data.includes('party-chat?')) {
+          const url = new URL(data);
+          const roomId = url.searchParams.get('roomId');
+          const key = url.searchParams.get('key');
+          const suggestedUsername = url.searchParams.get('username') || 'Novo Membro';
+          
+          if (roomId && key) {
+            parsedData = { roomId, key, suggestedUsername };
+          }
+        }
+      }
+
+      if (parsedData && parsedData.roomId && parsedData.key) {
+        const room = rooms.find(r => r.id === parsedData.roomId);
+        
+        if (!room) {
+          Alert.alert("Erro", "Sala não encontrada. Certifique-se de que a sala ainda existe.");
+          return;
+        }
+
+        if (parsedData.suggestedUsername && username === "Membro") {
+          setUsername(parsedData.suggestedUsername);
+        }
+
+        setRoomToJoin(room);
+        setJoinRoomKey(parsedData.key);
+        
+        Alert.alert(
+          "Entrar na Sala",
+          `Deseja entrar na sala "${room.name}"?`,
+          [
+            { text: "Cancelar", style: "cancel" },
+            {
+              text: "Entrar",
+              onPress: () => {
+                if (room.encryptionKey === parsedData.key) {
+                  const isAdmin = room.adminId === userId;
+                  setUserRole(isAdmin ? "admin" : "guest");
+                  setSelectedRoom(room);
+                  setJoinRoomKey("");
+                  Alert.alert("Sucesso", `Bem-vindo à sala "${room.name}"!`);
+                } else {
+                  Alert.alert("Erro", "Chave de encriptação incorreta");
+                }
+              },
+            },
+          ]
+        );
+      } else {
+        Alert.alert("Erro", "QR Code inválido. Use um código gerado pela aplicação.");
+      }
+    } catch (error) {
+      console.error('Error scanning QR:', error);
+      Alert.alert("Erro", "Não foi possível processar o QR Code.");
+    }
+  };
+
+  const openScanner = async () => {
+    if (!permission) {
+      await requestPermission();
+      return;
+    }
+
+    if (!permission.granted) {
+      Alert.alert(
+        "Permissão Necessária",
+        "Precisamos de acesso à câmera para escanear QR Codes.",
+        [
+          { text: "Cancelar", style: "cancel" },
+          { text: "Permitir", onPress: requestPermission },
+        ]
+      );
+      return;
+    }
+
+    setShowScanner(true);
   };
 
   const copyKey = async (key: string) => {
@@ -607,18 +707,28 @@ export default function PartyChatScreen() {
         )}
       </ScrollView>
 
-      <LinearGradient
-        colors={["#00D4FF", "#0099CC"]}
-        style={styles.createButton}
-      >
-        <TouchableOpacity
-          style={styles.createButtonTouchable}
-          onPress={() => setShowCreateModal(true)}
+      <View style={styles.bottomButtons}>
+        <LinearGradient
+          colors={["#00D4FF", "#0099CC"]}
+          style={styles.createButton}
         >
-          <Plus size={24} color="#FFFFFF" />
-          <Text style={styles.createButtonText}>Criar Nova Sala</Text>
+          <TouchableOpacity
+            style={styles.createButtonTouchable}
+            onPress={() => setShowCreateModal(true)}
+          >
+            <Plus size={24} color="#FFFFFF" />
+            <Text style={styles.createButtonText}>Criar Nova Sala</Text>
+          </TouchableOpacity>
+        </LinearGradient>
+
+        <TouchableOpacity
+          style={styles.scanButton}
+          onPress={openScanner}
+        >
+          <CameraIcon size={24} color="#00D4FF" />
+          <Text style={styles.scanButtonText}>Escanear QR</Text>
         </TouchableOpacity>
-      </LinearGradient>
+      </View>
 
       <Modal
         visible={showCreateModal}
@@ -760,13 +870,21 @@ export default function PartyChatScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.qrModal}>
             <Text style={styles.qrTitle}>QR Code da Sala</Text>
-            <Text style={styles.qrSubtitle}>Escaneie para entrar</Text>
+            <Text style={styles.qrSubtitle}>Escaneie para entrar automaticamente</Text>
             
             <View style={styles.qrContainer}>
-              <View style={styles.qrPlaceholder}>
-                <QrCode size={200} color="#00D4FF" />
-                <Text style={styles.qrPlaceholderText}>QR Code</Text>
-              </View>
+              {qrImageUrl ? (
+                <Image
+                  source={{ uri: qrImageUrl }}
+                  style={styles.qrImage}
+                  resizeMode="contain"
+                />
+              ) : (
+                <View style={styles.qrPlaceholder}>
+                  <QrCode size={200} color="#00D4FF" />
+                  <Text style={styles.qrPlaceholderText}>Gerando QR Code...</Text>
+                </View>
+              )}
             </View>
 
             <View style={styles.qrInfo}>
@@ -787,6 +905,10 @@ export default function PartyChatScreen() {
               </View>
             </View>
 
+            <View style={styles.qrInstructions}>
+              <Text style={styles.qrInstructionsText}>💡 Escaneie este QR Code com a câmera da app para entrar automaticamente na sala</Text>
+            </View>
+
             <TouchableOpacity
               style={styles.qrCloseButton}
               onPress={() => setShowQRModal(false)}
@@ -794,6 +916,38 @@ export default function PartyChatScreen() {
               <Text style={styles.qrCloseText}>Fechar</Text>
             </TouchableOpacity>
           </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={showScanner}
+        animationType="slide"
+        onRequestClose={() => setShowScanner(false)}
+      >
+        <View style={styles.scannerContainer}>
+          <View style={styles.scannerHeader}>
+            <Text style={styles.scannerTitle}>Escanear QR Code</Text>
+            <TouchableOpacity
+              style={styles.scannerCloseButton}
+              onPress={() => setShowScanner(false)}
+            >
+              <X size={28} color="#FFFFFF" />
+            </TouchableOpacity>
+          </View>
+
+          <CameraView
+            style={styles.camera}
+            facing="back"
+            onBarcodeScanned={handleBarCodeScanned}
+            barcodeScannerSettings={{
+              barcodeTypes: ["qr"],
+            }}
+          >
+            <View style={styles.scannerOverlay}>
+              <View style={styles.scannerFrame} />
+              <Text style={styles.scannerText}>Posicione o QR Code dentro do quadrado</Text>
+            </View>
+          </CameraView>
         </View>
       </Modal>
     </View>
@@ -913,14 +1067,33 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: "700" as const,
   },
+  bottomButtons: {
+    padding: 16,
+    gap: 12,
+  },
   createButton: {
-    margin: 16,
     borderRadius: 16,
     shadowColor: "#00D4FF",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.4,
     shadowRadius: 12,
     elevation: 6,
+  },
+  scanButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#1a1a2e",
+    padding: 18,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: "#00D4FF",
+    gap: 8,
+  },
+  scanButtonText: {
+    color: "#00D4FF",
+    fontSize: 17,
+    fontWeight: "700" as const,
   },
   createButtonTouchable: {
     flexDirection: "row",
@@ -1356,11 +1529,15 @@ const styles = StyleSheet.create({
     backgroundColor: "#F5F5F7",
     padding: 20,
     borderRadius: 16,
-    marginBottom: 24,
+    marginBottom: 20,
+  },
+  qrImage: {
+    width: 280,
+    height: 280,
   },
   qrPlaceholder: {
-    width: 240,
-    height: 240,
+    width: 280,
+    height: 280,
     backgroundColor: "#FFFFFF",
     borderRadius: 12,
     justifyContent: "center",
@@ -1374,6 +1551,18 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#00D4FF",
     fontWeight: "600" as const,
+  },
+  qrInstructions: {
+    backgroundColor: "#E8F8FF",
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 20,
+  },
+  qrInstructionsText: {
+    fontSize: 13,
+    color: "#0099CC",
+    textAlign: "center",
+    lineHeight: 18,
   },
   qrInfo: {
     width: "100%",
@@ -1411,5 +1600,50 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 17,
     fontWeight: "600" as const,
+  },
+  scannerContainer: {
+    flex: 1,
+    backgroundColor: "#000000",
+  },
+  scannerHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 20,
+    paddingTop: 60,
+    backgroundColor: "rgba(0, 0, 0, 0.8)",
+  },
+  scannerTitle: {
+    fontSize: 20,
+    fontWeight: "700" as const,
+    color: "#FFFFFF",
+  },
+  scannerCloseButton: {
+    padding: 8,
+  },
+  camera: {
+    flex: 1,
+  },
+  scannerOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  scannerFrame: {
+    width: 250,
+    height: 250,
+    borderWidth: 3,
+    borderColor: "#00D4FF",
+    borderRadius: 16,
+    backgroundColor: "transparent",
+  },
+  scannerText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "600" as const,
+    marginTop: 30,
+    textAlign: "center",
+    paddingHorizontal: 40,
   },
 });
