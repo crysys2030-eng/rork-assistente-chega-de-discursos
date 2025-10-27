@@ -37,8 +37,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Clipboard from "expo-clipboard";
 import { z } from "zod";
-import * as FileSystem from "expo-file-system";
-import * as Sharing from "expo-sharing";
 
 interface TaskNote {
   task: string;
@@ -284,11 +282,6 @@ A minuta deve ser:
     try {
       const textContent = formatMinuteText(minute);
       const fileName = `minuta_${minute.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_${Date.now()}.txt`;
-      const filePath = `${FileSystem.documentDirectory}${fileName}`;
-
-      await FileSystem.writeAsStringAsync(filePath, textContent, {
-        encoding: FileSystem.EncodingType.UTF8,
-      });
 
       if (Platform.OS === 'web') {
         const blob = new Blob([textContent], { type: 'text/plain' });
@@ -302,15 +295,10 @@ A minuta deve ser:
         URL.revokeObjectURL(url);
         Alert.alert("Sucesso", "Documento transferido!");
       } else {
-        const canShare = await Sharing.isAvailableAsync();
-        if (canShare) {
-          await Sharing.shareAsync(filePath);
-        } else {
-          await Share.share({
-            message: textContent,
-            title: `Minuta: ${minute.title}`,
-          });
-        }
+        await Share.share({
+          message: textContent,
+          title: `Minuta: ${minute.title}`,
+        });
       }
     } catch (error) {
       console.error("Error generating document:", error);
