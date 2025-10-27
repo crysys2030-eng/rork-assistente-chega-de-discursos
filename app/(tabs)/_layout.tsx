@@ -1,5 +1,5 @@
 import { Tabs } from "expo-router";
-import { Calendar, Mic, FileText, ListChecks, MessageSquare } from "lucide-react-native";
+import { Calendar, Mic, FileText, ListChecks } from "lucide-react-native";
 import React from "react";
 
 export default function TabLayout() {
@@ -43,13 +43,6 @@ export default function TabLayout() {
         options={{
           title: "Tarefas Chega",
           tabBarIcon: ({ color }) => <ListChecks color={color} size={24} />,
-        }}
-      />
-      <Tabs.Screen
-        name="chega-chat"
-        options={{
-          title: "Chat AI",
-          tabBarIcon: ({ color }) => <MessageSquare color={color} size={24} />,
         }}
       />
     </Tabs>
