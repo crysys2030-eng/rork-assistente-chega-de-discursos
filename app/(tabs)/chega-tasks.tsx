@@ -1,4 +1,4 @@
-import { generateObject } from "@rork/toolkit-sdk";
+import { generateObject } from "@/lib/rork-sdk-shim";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import createContextHook from "@nkzw/create-context-hook";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
