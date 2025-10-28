@@ -323,6 +323,63 @@ function TasksScreen() {
     return Math.round((completed / taskList.tasks.length) * 100);
   };
 
+  const handleGenerateAutoTaskList = async () => {
+    setIsGenerating(true);
+    try {
+      const existingTitles = taskLists.map((t) => t.title).filter((t) => !!t);
+      const schema = z.object({
+        title: z.string().describe("Título da lista de tarefas"),
+        description: z.string().describe("Breve descrição do objetivo"),
+        tasks: z
+          .array(
+            z.object({
+              title: z.string().describe("Título da tarefa"),
+              description: z.string().describe("Descrição detalhada da tarefa"),
+              priority: z.enum(["high", "medium", "low"]).describe("Prioridade"),
+              deadline: z.string().optional().describe("Prazo sugerido"),
+              assignedTo: z.string().optional().describe("Responsável sugerido"),
+            })
+          )
+          .describe("Lista de 8-15 tarefas executáveis"),
+      });
+
+      const prompt = `Gera 100% por IA uma lista moderna e objetiva de tarefas para o partido Chega.
+- Primeiro escolhe tu a área mais relevante AGORA (campanha, comunicação, eventos, mobilização, legislação, organização ou outra).
+- O título não pode repetir existentes: ${existingTitles.join(", ") || "nenhum"}.
+- Inclui descrição breve e 10-14 tarefas com prioridade, prazos e responsáveis sugeridos.
+- Foco em ações concretas e mensuráveis.`;
+
+      const result = await generateObject({ messages: [{ role: "user", content: prompt }], schema });
+
+      const newTaskList: TaskList = {
+        id: Date.now().toString(),
+        title: result.title,
+        description: result.description,
+        category: "custom",
+        tasks: (result.tasks ?? []).map((task, index) => ({
+          id: `${Date.now()}_${index}`,
+          title: task.title,
+          description: task.description,
+          priority: task.priority,
+          completed: false,
+          category: "Personalizado",
+          deadline: task.deadline,
+          assignedTo: task.assignedTo,
+          createdAt: new Date(),
+        })),
+        createdAt: new Date(),
+      };
+
+      addTaskList(newTaskList);
+      Alert.alert("Sucesso", "Lista de tarefas gerada automaticamente por IA!");
+    } catch (error) {
+      console.error("Error generating auto task list:", error);
+      Alert.alert("Erro", "Não foi possível gerar automaticamente. Tente novamente.");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   return (
     <View style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
@@ -341,7 +398,7 @@ function TasksScreen() {
             style={styles.addButton}
           >
             <TouchableOpacity
-              onPress={() => setShowCategoryModal(true)}
+              onPress={handleGenerateAutoTaskList}
               style={styles.addButtonTouchable}
               disabled={isGenerating}
             >

@@ -244,6 +244,60 @@ A minuta deve ser:
     }
   };
 
+  const handleGenerateAuto = async () => {
+    setIsGenerating(true);
+    try {
+      const existingTitles = minutes.map((m) => m.title).filter((t) => !!t);
+      const schema = z.object({
+        title: z.string().describe("Título da reunião"),
+        date: z.string().describe("Data da reunião em formato DD/MM/YYYY"),
+        attendees: z.array(z.string()).describe("Lista de participantes"),
+        topics: z.array(z.string()).describe("Principais tópicos discutidos"),
+        summary: z.string().describe("Resumo detalhado com decisões e próximos passos"),
+        tasks: z
+          .array(
+            z.object({
+              task: z.string().describe("Descrição da tarefa"),
+              priority: z.enum(["high", "medium", "low"]).describe("Prioridade"),
+              assignedTo: z.string().optional().describe("Responsável"),
+              deadline: z.string().optional().describe("Prazo DD/MM/YYYY"),
+            })
+          )
+          .describe("Lista de tarefas e ações"),
+      });
+
+      const prompt = `Escolhe e define 100% por IA uma reunião relevante do contexto político português (partido Chega).
+- O tema deve ser atual, específico e não repetir títulos existentes: ${existingTitles.join(", ") || "nenhum"}.
+- Gera título, data (usa data de hoje se necessário), participantes, tópicos, resumo e tarefas com prioridades, responsáveis e prazos.
+- Mantém tom profissional e orientado a ação.`;
+
+      const result = await generateObject({
+        messages: [{ role: "user", content: prompt }],
+        schema,
+      });
+
+      const newMinute: Minute = {
+        id: Date.now().toString(),
+        title: result.title,
+        date: result.date,
+        attendees: result.attendees ?? [],
+        topics: result.topics ?? [],
+        summary: result.summary ?? "",
+        tasks: result.tasks ?? [],
+        taskList: [],
+        createdAt: new Date(),
+      };
+
+      addMinute(newMinute);
+      Alert.alert("Sucesso", "Minuta gerada automaticamente por IA!");
+    } catch (error) {
+      console.error("Error generating auto minute:", error);
+      Alert.alert("Erro", "Não foi possível gerar automaticamente. Tente novamente.");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   const confirmAsync = useCallback((title: string, message: string) => {
     return new Promise<boolean>((resolve) => {
       if (Platform.OS === 'web') {
@@ -389,7 +443,7 @@ A minuta deve ser:
               style={styles.addButton}
             >
               <TouchableOpacity
-                onPress={() => setShowGenerateModal(true)}
+                onPress={handleGenerateAuto}
                 style={styles.addButtonTouchable}
               >
                 <Plus size={24} color="#FFFFFF" />
