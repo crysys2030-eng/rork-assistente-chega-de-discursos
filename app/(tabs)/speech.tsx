@@ -1,4 +1,4 @@
-import { generateObject } from "@/lib/ai-bridge";
+import { generateObject, isLocalAI } from "@/lib/ai-bridge";
 import { Stack } from "expo-router";
 import { Sparkles, Loader2, Copy, Check, ExternalLink, Trash2, Shield } from "lucide-react-native";
 import React, { useState } from "react";
@@ -37,12 +37,81 @@ export default function SpeechScreen() {
   });
 
   const [generatedSpeech, setGeneratedSpeech] = useState("");
-  const [sources, setSources] = useState<Array<{ title: string; url: string; relevance: string }>>([]);
+  const [sources, setSources] = useState<{ title: string; url: string; relevance: string }[]>([]);
   const [extractedKeywords, setExtractedKeywords] = useState<string[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [showSpeech, setShowSpeech] = useState(false);
+
+  const splitKeywords = (raw: string): string[] => {
+    return raw
+      .split(",")
+      .map((k) => k.trim())
+      .filter((k) => k.length > 0)
+      .map((k) => k.replace(/[#]/g, ""))
+      .slice(0, 12);
+  };
+
+  const toTitle = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+  const ensureKeywordsInText = (text: string, kws: string[]): string => {
+    const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const missing = kws.filter((kw) => !new RegExp(`\\b${escape(kw)}\\b`, "i").test(text));
+    if (missing.length === 0) return text;
+    const extra = `\n\nPalavras-chave: ${missing.map((k) => `#${k}`).join("  ")}`;
+    return text + extra;
+  };
+
+  const buildLocalSpeech = (data: SpeechFormData): { speech: string; sources: { title: string; url: string; relevance: string }[]; extractedKeywords: string[] } => {
+    const kws = data.keywords.trim() ? splitKeywords(data.keywords) : [];
+    const toneMap: Record<SpeechFormData["tone"], { opener: string; style: string }> = {
+      radical: { opener: "Portugueses e Portuguesas, chega!", style: "tom assertivo, direto e combativo" },
+      formal: { opener: "Minhas senhoras e meus senhores,", style: "tom institucional, claro e objetivo" },
+      inspiracional: { opener: "Portugueses e Portuguesas,", style: "tom motivador, mobilizador e positivo" },
+      informal: { opener: "Amigos e amigas,", style: "tom próximo, simples e franco" },
+    };
+    const toneCfg = toneMap[data.tone] ?? toneMap.radical;
+
+    const minutes = parseInt(data.duration || "5", 10);
+    const blocks = Math.max(3, Math.min(8, Math.round(minutes)));
+
+    const segments: string[] = [];
+    segments.push(`${toneCfg.opener}`);
+
+    const introKw = kws[0] ? ` ${kws[0]}` : "";
+    segments.push(
+      `Hoje falamos de ${data.topic.trim()}.${introKw ? " " + toTitle(introKw) + "." : ""} Em ${toneCfg.style}, reforçamos a soberania nacional, a identidade portuguesa e o combate sem tréguas à corrupção.`
+    );
+
+    const agenda = [
+      "soberania e fronteiras", "fim de privilégios e corrupção", "segurança e autoridade do Estado",
+      "defesa da família e mérito", "economia que premia o trabalho"
+    ];
+
+    for (let i = 0; i < blocks - 2; i++) {
+      const base = agenda[i % agenda.length];
+      const kw = kws[i + 1] ? ` ${kws[i + 1]}` : "";
+      segments.push(
+        `Sobre ${base}:${kw ? " " + toTitle(kw) + "." : ""} Exigimos regras claras, transparência e justiça. Portugal deve voltar a premiar quem cumpre e a responsabilizar quem abusa do Estado.`
+      );
+    }
+
+    segments.push(
+      `Concluo com um apelo: juntos, com coragem e verdade, faremos um Portugal mais justo, seguro e livre. ${data.audience ? toTitle(data.audience) + ", " : ""}contamos convosco.`
+    );
+
+    let speech = segments.join("\n\n");
+    if (kws.length > 0) speech = ensureKeywordsInText(speech, kws);
+
+    const sources = [
+      { title: "Público", url: "https://www.publico.pt/", relevance: "Referência para factos e reportagens nacionais" },
+      { title: "Expresso", url: "https://expresso.pt/", relevance: "Análises e investigações relevantes" },
+      { title: "Portal do Governo", url: "https://www.portugal.gov.pt/", relevance: "Documentos oficiais e indicadores" },
+    ];
+
+    return { speech, sources, extractedKeywords: kws };
+  };
 
   const handleGenerate = async () => {
     if (!formData.topic.trim()) {
@@ -103,14 +172,23 @@ IMPORTANTE: Fornece SEMPRE fontes reais e verificáveis para os factos mencionad
 
 Não inclua títulos ou metadados no discurso, apenas o texto pronto a ser lido.`;
 
+      if (isLocalAI) {
+        const local = buildLocalSpeech(formData);
+        setGeneratedSpeech(local.speech);
+        setSources(local.sources);
+        setExtractedKeywords(local.extractedKeywords);
+        setShowSpeech(true);
+        return;
+      }
+
       const result = await generateObject({
         messages: [{ role: "user", content: prompt }],
         schema
       });
-      
+
       setGeneratedSpeech(result.speech);
       setSources(result.sources);
-      setExtractedKeywords(result.extractedKeywords ?? []);
+      setExtractedKeywords((result as any).extractedKeywords ?? splitKeywords(formData.keywords));
       setShowSpeech(true);
     } catch (error) {
       console.error("Error generating speech:", error);
