@@ -1,156 +1,113 @@
-import { generateText } from "@/lib/ai-bridge";
+import { generateObject } from "@/lib/ai-bridge";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import createContextHook from "@nkzw/create-context-hook";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
-import { Check, Copy, Loader2, Megaphone, Plus, Sparkles, Trash2 } from "lucide-react-native";
+import { Megaphone, Loader2, Sparkles, Copy, Check, Trash2 } from "lucide-react-native";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   ScrollView,
-  Share,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Clipboard from "expo-clipboard";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { z } from "zod";
 
-
-interface SpeechDraft {
+interface Speech {
   id: string;
   title: string;
   keywords: string[];
-  audience: string;
-  tone: "institucional" | "mobilizador" | "técnico" | "comício";
-  durationMinutes: number;
-  outline: string[];
-  speech: string;
+  content: string;
   createdAt: Date;
 }
 
-const [SpeechContext, useSpeech] = createContextHook(() => {
-  const [drafts, setDrafts] = useState<SpeechDraft[]>([]);
-  const queryClient = useQueryClient();
+const [SpeechContext, useSpeeches] = createContextHook(() => {
+  const [speeches, setSpeeches] = useState<Speech[]>([]);
+  const qc = useQueryClient();
 
-  const query = useQuery({
-    queryKey: ["speech-drafts"],
+  const q = useQuery({
+    queryKey: ["speeches"],
     queryFn: async () => {
-      const stored = await AsyncStorage.getItem("speech-drafts");
-      if (!stored) return [] as SpeechDraft[];
-      const parsed = JSON.parse(stored) as any[];
-      return parsed.map((d) => ({
-        ...d,
-        createdAt: new Date(d?.createdAt ?? Date.now()),
-        keywords: Array.isArray(d?.keywords) ? d.keywords : [],
-        outline: Array.isArray(d?.outline) ? d.outline : [],
-        title: d?.title ?? "",
-        audience: d?.audience ?? "",
-        tone: (d?.tone as SpeechDraft["tone"]) ?? "institucional",
-        durationMinutes: Number(d?.durationMinutes ?? 5),
-        speech: d?.speech ?? "",
-        id: String(d?.id ?? Date.now()),
-      }));
+      try {
+        const raw = await AsyncStorage.getItem("speeches");
+        if (!raw) return [] as Speech[];
+        const parsed = JSON.parse(raw) as any[];
+        return parsed.map((s) => ({
+          id: String(s?.id ?? Date.now()),
+          title: String(s?.title ?? "Discurso"),
+          keywords: Array.isArray(s?.keywords) ? s.keywords : [],
+          content: String(s?.content ?? ""),
+          createdAt: new Date(s?.createdAt ?? Date.now()),
+        }));
+      } catch (e) {
+        console.log("Speech: load error", e);
+        return [] as Speech[];
+      }
     },
   });
 
-  const syncMutation = useMutation({
-    mutationFn: async (next: SpeechDraft[]) => {
-      await AsyncStorage.setItem("speech-drafts", JSON.stringify(next));
-      return next;
+  const sync = useMutation({
+    mutationFn: async (list: Speech[]) => {
+      await AsyncStorage.setItem("speeches", JSON.stringify(list));
+      return list;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["speech-drafts"] });
-    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["speeches"] }),
   });
-  const { mutate: syncDrafts } = syncMutation;
+  const { mutate: syncSpeeches } = sync;
 
   useEffect(() => {
-    if (query.data) setDrafts(query.data);
-  }, [query.data]);
+    if (q.data) setSpeeches(q.data);
+  }, [q.data]);
 
-  const addDraft = useCallback((d: SpeechDraft) => {
-    const next = [...drafts, d];
-    setDrafts(next);
-    syncDrafts(next);
-  }, [drafts, syncDrafts]);
+  const addSpeech = useCallback((s: Speech) => {
+    const updated = [s, ...speeches];
+    setSpeeches(updated);
+    syncSpeeches(updated);
+  }, [speeches, syncSpeeches]);
 
-  const removeDraft = useCallback((id: string) => {
-    const next = drafts.filter((d) => d.id !== id);
-    setDrafts(next);
-    syncDrafts(next);
-  }, [drafts, syncDrafts]);
+  const removeSpeech = useCallback((id: string) => {
+    const updated = speeches.filter((s) => s.id !== id);
+    setSpeeches(updated);
+    syncSpeeches(updated);
+  }, [speeches, syncSpeeches]);
 
-  return useMemo(() => ({ drafts, addDraft, removeDraft, isLoading: query.isLoading }), [drafts, addDraft, removeDraft, query.isLoading]);
+  return useMemo(() => ({ speeches, addSpeech, removeSpeech, isLoading: q.isLoading }), [speeches, addSpeech, removeSpeech, q.isLoading]);
 });
 
 function SpeechAIScreen() {
   const insets = useSafeAreaInsets();
-  const { drafts, addDraft, removeDraft } = useSpeech();
+  const { speeches, addSpeech, removeSpeech } = useSpeeches();
 
-  const [title, setTitle] = useState<string>("");
+  const [keywordsInput, setKeywordsInput] = useState<string>("");
+  const [customTitle, setCustomTitle] = useState<string>("");
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [showManualModal, setShowManualModal] = useState<boolean>(false);
 
-  const confirmAsync = useCallback((titleText: string, message: string) => {
+  const existingTitles = useMemo(() => speeches.map((s) => s.title).filter(Boolean), [speeches]);
+
+  const confirmAsync = useCallback((title: string, message: string) => {
     return new Promise<boolean>((resolve) => {
       if (Platform.OS === 'web') {
-        const ok = globalThis.confirm ? globalThis.confirm(`${titleText}\n\n${message}`) : true;
+        const ok = globalThis.confirm ? globalThis.confirm(`${title}\n\n${message}`) : true;
         resolve(ok);
         return;
       }
-      Alert.alert(titleText, message, [
+      Alert.alert(title, message, [
         { text: 'Cancelar', style: 'cancel', onPress: () => resolve(false) },
         { text: 'Eliminar', style: 'destructive', onPress: () => resolve(true) },
       ]);
     });
   }, []);
-
-
-
-  const handleGenerate = async () => {
-    const brief = title.trim();
-    if (!brief) {
-      Alert.alert("Indicação em falta", "Escreva um tema ou frase base para gerar o texto.");
-      return;
-    }
-
-    setIsGenerating(true);
-    try {
-      const prompt = `Gera apenas o TEXTO completo de um discurso em português de Portugal sobre: "${brief}". Não incluas títulos, marcadores, secções, metadados nem notas — só o corpo do discurso, fluido, com 6–8 minutos de leitura. Cumpre as leis portuguesas (pluralismo, responsabilidade, rejeição de incitação ao ódio).`;
-      const result = await generateText({ messages: [{ role: "user", content: prompt }] });
-      const finalSpeech = typeof result === "string" ? result.trim() : "";
-
-      if (finalSpeech.length === 0) {
-        throw new Error("Conteúdo vazio");
-      }
-
-      const draft: SpeechDraft = {
-        id: Date.now().toString(),
-        title: brief,
-        keywords: [],
-        audience: "",
-        tone: "institucional",
-        durationMinutes: 0,
-        outline: [],
-        speech: finalSpeech,
-        createdAt: new Date(),
-      };
-      addDraft(draft);
-      setTitle("");
-      Alert.alert("Sucesso", "Texto gerado com IA.");
-    } catch (e) {
-      console.error("speech-ai generate error", e);
-      Alert.alert("Erro", e instanceof Error ? e.message : "Não foi possível gerar. Tente novamente.");
-    } finally {
-      setIsGenerating(false);
-    }
-  };
 
   const handleCopy = async (text: string, id: string) => {
     await Clipboard.setStringAsync(text);
@@ -158,119 +115,208 @@ function SpeechAIScreen() {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const handleExport = async (d: SpeechDraft) => {
-    const fileName = `texto_${d.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_${Date.now()}.txt`;
-    const content = `${d.speech}`;
+  const handleGenerate = async () => {
+    const rawKeywords = keywordsInput
+      .split(',')
+      .map((k) => k.trim())
+      .filter((k) => k.length > 0);
 
+    if (rawKeywords.length === 0) {
+      Alert.alert("Erro", "Insira palavras‑chave separadas por vírgulas.");
+      return;
+    }
+
+    setIsGenerating(true);
     try {
-      if (Platform.OS === 'web') {
-        const blob = new Blob([content], { type: 'text/plain' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = fileName;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-        Alert.alert("Sucesso", "Documento transferido!");
-      } else {
-        await Share.share({ title: d.title, message: content });
-      }
-    } catch (e) {
-      console.error('speech export error', e);
-      Alert.alert('Erro', 'Não foi possível exportar. Use copiar.');
+      const schema = z.object({
+        title: z.string().describe("Título forte e único do discurso"),
+        content: z.string().describe("Discurso completo apenas em texto, pronto para leitura em palco")
+      });
+
+      const prompt = `Gera um discurso político 100% criado por IA, em português europeu, moderno e persuasivo.
+- Usa estas palavras‑chave obrigatórias: ${rawKeywords.join(', ')}
+- O tema, estrutura e ideias devem ser definidos pela IA.
+- O título NÃO pode repetir nenhum existente: ${existingTitles.join(', ') || 'nenhum'}
+- Apenas DEVOLVE TEXTO do discurso e um título (sem listas técnicas, sem explicações, sem marcações markdown).
+- Traz: abertura impactante, 3-5 secções com narrativa coerente, conclusão mobilizadora.
+- Tom: assertivo, claro, democrático, orientado a valores e propostas concretas.
+- Evita linguagem ofensiva e generalizações.`;
+
+      const result = await generateObject({ messages: [{ role: "user", content: prompt }], schema });
+
+      const speech: Speech = {
+        id: Date.now().toString(),
+        title: customTitle.trim() || result.title,
+        keywords: rawKeywords,
+        content: result.content,
+        createdAt: new Date(),
+      };
+
+      addSpeech(speech);
+      setKeywordsInput("");
+      setCustomTitle("");
+      Alert.alert("Sucesso", "Discurso gerado por IA!");
+    } catch (e: any) {
+      console.log("speech-ai generate error", e);
+      Alert.alert("Erro", e?.message ? String(e.message) : "Falha ao gerar. Tente novamente.");
+    } finally {
+      setIsGenerating(false);
     }
   };
 
-  const deleteDraft = async (id: string) => {
+  const handleAutoGenerate = async () => {
+    setIsGenerating(true);
+    try {
+      const schema = z.object({
+        title: z.string(),
+        keywords: z.array(z.string()),
+        content: z.string(),
+      });
+
+      const prompt = `Cria um discurso político 100% IA, tema escolhido por IA, único e não repetido.
+- Não repitas títulos: ${existingTitles.join(', ') || 'nenhum'}
+- Devolve apenas texto do discurso e um título forte.
+- Inclui 6-10 palavras‑chave coerentes embebidas no conteúdo.`;
+
+      const result = await generateObject({ messages: [{ role: "user", content: prompt }], schema });
+
+      const speech: Speech = {
+        id: Date.now().toString(),
+        title: result.title,
+        keywords: Array.isArray(result.keywords) ? result.keywords : [],
+        content: result.content,
+        createdAt: new Date(),
+      };
+
+      addSpeech(speech);
+      Alert.alert("Sucesso", "Discurso automático gerado!");
+    } catch (e: any) {
+      console.log("speech-ai auto error", e);
+      Alert.alert("Erro", "Não foi possível gerar automaticamente.");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const deleteSpeech = async (id: string) => {
     const ok = await confirmAsync('Eliminar', 'Deseja eliminar este discurso?');
-    if (ok) removeDraft(id);
+    if (ok) removeSpeech(id);
   };
 
   return (
-    <View style={styles.container} testID="speechAiScreen">
+    <View style={styles.container} testID="speech-ai-screen">
       <Stack.Screen options={{ headerShown: false }} />
       <View style={[styles.headerWrapper, { paddingTop: insets.top }]}
-        testID="speechHeader">
+        testID="speech-ai-header">
         <LinearGradient colors={["#1a1a2e", "#16213e"]} style={styles.header}>
           <View style={styles.headerContent}>
             <View>
-              <Text style={styles.headerTitle}>📣 Texto IA</Text>
-              <Text style={styles.headerSubtitle}>Geração apenas de texto (PT‑PT)</Text>
+              <Text style={styles.headerTitle}>📣 Discurso IA</Text>
+              <Text style={styles.headerSubtitle}>Gerador online por palavras‑chave</Text>
             </View>
-            <View style={{ flexDirection: 'row', gap: 12 }}>
-              <LinearGradient colors={["#00D4FF", "#0099CC"]} style={styles.addButton}>
-                <TouchableOpacity onPress={handleGenerate} style={styles.addButtonTouchable} disabled={isGenerating} testID="generateButton">
-                  {isGenerating ? <Loader2 size={24} color="#FFFFFF" /> : <Sparkles size={24} color="#FFFFFF" />}
-                </TouchableOpacity>
-              </LinearGradient>
-            </View>
+            <LinearGradient colors={["#E94E1B", "#D63E0F"]} style={styles.addButton}>
+              <TouchableOpacity onPress={handleAutoGenerate} style={styles.addButtonTouchable} disabled={isGenerating}
+                testID="speech-ai-auto-generate">
+                {isGenerating ? (
+                  <Loader2 size={24} color="#FFFFFF" />
+                ) : (
+                  <Sparkles size={24} color="#FFFFFF" />
+                )}
+              </TouchableOpacity>
+            </LinearGradient>
           </View>
         </LinearGradient>
       </View>
 
       <ScrollView style={styles.scrollView} keyboardShouldPersistTaps="handled">
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <View style={styles.form}>
-            <View style={styles.inputRow}>
-              <Text style={styles.label}>Tema ou frase base</Text>
-              <TextInput
-                style={styles.input}
-                value={title}
-                onChangeText={setTitle}
-                placeholder="Ex: Prioridades para o próximo orçamento do município"
-                placeholderTextColor="#8E8E93"
-                testID="titleInput"
-              />
-            </View>
-          </View>
-        </KeyboardAvoidingView>
+        <View style={styles.inputCard} testID="speech-ai-input-card">
+          <Text style={styles.label}>Palavras‑chave</Text>
+          <TextInput
+            style={styles.input}
+            value={keywordsInput}
+            onChangeText={setKeywordsInput}
+            placeholder="ex: economia, segurança, saúde, educação"
+            placeholderTextColor="#8E8E93"
+            testID="speech-ai-keywords-input"
+          />
+          <Text style={styles.hint}>Separe com vírgulas. A IA cria o resto.</Text>
 
-        {drafts.length === 0 ? (
-          <View style={styles.emptyState} testID="emptySpeechState">
-            <Megaphone size={64} color="#C7C7CC" />
-            <Text style={styles.emptyTitle}>Sem textos gerados</Text>
-            <Text style={styles.emptySubtitle}>Escreva um tema e toque em Gerar</Text>
-          </View>
-        ) : (
-          <View style={styles.listContainer}>
-            {[...drafts]
-              .sort((a, b) => (b.createdAt instanceof Date ? b.createdAt : new Date(b.createdAt)).getTime() - (a.createdAt instanceof Date ? a.createdAt : new Date(a.createdAt)).getTime())
-              .map((d) => (
-                <LinearGradient key={d.id} colors={["#0f3460", "#16213e"]} style={styles.card}>
-                  <View style={styles.cardHeader}>
-                    <View style={styles.iconWrap}>
-                      <Megaphone size={20} color="#FFFFFF" />
-                    </View>
+          <Text style={[styles.label, { marginTop: 12 }]}>Título (opcional)</Text>
+          <TextInput
+            style={styles.input}
+            value={customTitle}
+            onChangeText={setCustomTitle}
+            placeholder="Título personalizado"
+            placeholderTextColor="#8E8E93"
+            testID="speech-ai-title-input"
+          />
+
+          <LinearGradient colors={isGenerating ? ["#C7C7CC", "#8E8E93"] : ["#E94E1B", "#D63E0F"]} style={styles.generateButton}>
+            <TouchableOpacity onPress={handleGenerate} style={styles.generateButtonInner} disabled={isGenerating} testID="speech-ai-generate">
+              {isGenerating ? (
+                <>
+                  <Loader2 size={20} color="#FFFFFF" />
+                  <Text style={styles.generateButtonText}>A gerar…</Text>
+                </>
+              ) : (
+                <>
+                  <Megaphone size={20} color="#FFFFFF" />
+                  <Text style={styles.generateButtonText}>Gerar Discurso</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </LinearGradient>
+        </View>
+
+        <View style={styles.listContainer}>
+          {(speeches ?? []).length === 0 ? (
+            <View style={styles.emptyState} testID="speech-ai-empty">
+              <Megaphone size={64} color="#C7C7CC" />
+              <Text style={styles.emptyTitle}>Sem discursos ainda</Text>
+              <Text style={styles.emptySubtitle}>Escreva palavras‑chave ou use geração automática</Text>
+            </View>
+          ) : (
+            <View>
+              {(speeches ?? []).map((s) => (
+                <LinearGradient key={s.id} colors={["#0f3460", "#16213e"]} style={styles.speechCard}>
+                  <View style={styles.speechHeader}>
+                    <View style={styles.speechIcon}><Megaphone size={20} color="#FFFFFF" /></View>
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.cardTitle}>{d.title}</Text>
+                      <Text style={styles.speechTitle}>{s.title}</Text>
+                      {s.keywords && s.keywords.length > 0 && (
+                        <Text style={styles.keywordsText}>{s.keywords.join(" • ")}</Text>
+                      )}
                     </View>
-                    <TouchableOpacity onPress={() => deleteDraft(d.id)} style={styles.deleteBtn} testID={`delete-${d.id}`}>
+                    <TouchableOpacity onPress={() => deleteSpeech(s.id)} style={styles.deleteBtn} testID={`speech-delete-${s.id}`}>
                       <Trash2 size={18} color="#FF3B30" />
                     </TouchableOpacity>
                   </View>
-
-                  <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Texto</Text>
-                    <Text style={styles.speechText}>{d.speech}</Text>
-                  </View>
-
-                  <View style={styles.actions}>
-                    <TouchableOpacity style={styles.actionBtn} onPress={() => handleExport(d)} testID={`export-${d.id}`}>
-                      <Plus size={18} color="#00D4FF" />
-                      <Text style={styles.actionText}>Exportar</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.actionBtn} onPress={() => handleCopy(d.speech, d.id)} testID={`copy-${d.id}`}>
-                      {copiedId === d.id ? <Check size={18} color="#34C759" /> : <Copy size={18} color="#00D4FF" />}
-                      <Text style={styles.actionText}>{copiedId === d.id ? 'Copiado' : 'Copiar'}</Text>
+                  <Text style={styles.contentText}>{s.content}</Text>
+                  <View style={styles.actionsRow}>
+                    <TouchableOpacity style={styles.actionButton} onPress={() => handleCopy(`${s.title}\n\n${s.content}`, s.id)} testID={`speech-copy-${s.id}`}>
+                      {copiedId === s.id ? <Check size={18} color="#34C759" /> : <Copy size={18} color="#00D4FF" />}
+                      <Text style={styles.actionText}>{copiedId === s.id ? "Copiado" : "Copiar"}</Text>
                     </TouchableOpacity>
                   </View>
                 </LinearGradient>
               ))}
-          </View>
-        )}
+            </View>
+          )}
+        </View>
       </ScrollView>
+
+      <Modal visible={showManualModal} animationType="slide" transparent onRequestClose={() => setShowManualModal(false)}>
+        <View style={styles.modalOverlay}>
+          <KeyboardAvoidingView style={styles.modalKeyboard} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Novo Discurso</Text>
+                <TouchableOpacity onPress={() => setShowManualModal(false)}><Text style={styles.modalClose}>✕</Text></TouchableOpacity>
+              </View>
+            </View>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -289,30 +335,35 @@ const styles = StyleSheet.create({
   header: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 20 },
   headerContent: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   headerTitle: { fontSize: 28, fontWeight: "700" as const, color: "#FFFFFF", marginBottom: 4 },
-  headerSubtitle: { fontSize: 15, color: "#00D4FF", fontWeight: "500" as const },
-  addButton: { borderRadius: 24, shadowColor: "#00D4FF", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 8, elevation: 5 },
+  headerSubtitle: { fontSize: 15, color: "#E94E1B", fontWeight: "500" as const },
+  addButton: { borderRadius: 24, shadowColor: "#E94E1B", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 8, elevation: 5 },
   addButtonTouchable: { width: 48, height: 48, justifyContent: "center", alignItems: "center" },
   scrollView: { flex: 1, backgroundColor: "#0f0f23" },
-  form: { padding: 16, gap: 12 },
-  inputRow: { gap: 8 },
-  label: { fontSize: 14, color: "#FFFFFF", fontWeight: "600" as const },
+  inputCard: { margin: 16, padding: 16, borderRadius: 16, backgroundColor: "#111436", borderWidth: 1, borderColor: "rgba(233, 78, 27, 0.2)" },
+  label: { fontSize: 14, color: "#FFFFFF", fontWeight: "600" as const, marginBottom: 8 },
   input: { backgroundColor: "#F5F5F7", borderRadius: 12, padding: 14, fontSize: 16, color: "#000000", borderWidth: 1, borderColor: "#E5E5EA" },
-  row2: { flexDirection: "row", gap: 12 },
-  emptyState: { flex: 1, justifyContent: "center", alignItems: "center", paddingTop: 80, paddingHorizontal: 40 },
-  emptyTitle: { fontSize: 20, fontWeight: "600" as const, color: "#FFFFFF", marginTop: 16, marginBottom: 8 },
-  emptySubtitle: { fontSize: 16, color: "#8E8E93", textAlign: "center" },
+  hint: { fontSize: 12, color: "#8E8E93", marginTop: 6 },
+  generateButton: { borderRadius: 14, marginTop: 14 },
+  generateButtonInner: { paddingVertical: 14, flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 8 },
+  generateButtonText: { color: "#FFFFFF", fontSize: 16, fontWeight: "700" as const },
   listContainer: { padding: 16, gap: 12 },
-  card: { borderRadius: 16, padding: 16, marginBottom: 12, shadowColor: "#00D4FF", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 12, elevation: 5 },
-  cardHeader: { flexDirection: "row", alignItems: "flex-start", marginBottom: 12 },
-  iconWrap: { width: 40, height: 40, borderRadius: 20, backgroundColor: "#00D4FF", justifyContent: "center", alignItems: "center", marginRight: 12 },
-  cardTitle: { fontSize: 18, fontWeight: "700" as const, color: "#FFFFFF", marginBottom: 2 },
-  cardMeta: { fontSize: 12, color: "#00D4FF", marginBottom: 6 },
-  section: { marginTop: 8 },
-  sectionTitle: { fontSize: 16, fontWeight: "700" as const, color: "#FFFFFF", marginBottom: 6 },
-  listItem: { fontSize: 14, color: "#FFFFFF", lineHeight: 22, marginBottom: 2 },
-  speechText: { fontSize: 14, color: "#FFFFFF", lineHeight: 22 },
-  actions: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 10 },
-  actionBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0, 212, 255, 0.2)", paddingVertical: 10, paddingHorizontal: 12, borderRadius: 12, gap: 6 },
+  emptyState: { alignItems: "center", paddingTop: 80 },
+  emptyTitle: { fontSize: 18, fontWeight: "600" as const, color: "#FFFFFF", marginTop: 12, marginBottom: 6 },
+  emptySubtitle: { fontSize: 14, color: "#8E8E93", textAlign: "center" },
+  speechCard: { borderRadius: 16, padding: 16, marginBottom: 12, shadowColor: "#E94E1B", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 12, elevation: 5 },
+  speechHeader: { flexDirection: "row", alignItems: "flex-start", marginBottom: 10 },
+  speechIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: "#E94E1B", justifyContent: "center", alignItems: "center", marginRight: 12 },
+  speechTitle: { fontSize: 17, fontWeight: "700" as const, color: "#FFFFFF", marginBottom: 4 },
+  keywordsText: { fontSize: 12, color: "#E94E1B" },
+  contentText: { fontSize: 14, color: "#FFFFFF", lineHeight: 22 },
+  actionsRow: { flexDirection: "row", gap: 8, marginTop: 12 },
+  actionButton: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "rgba(0, 212, 255, 0.2)", paddingVertical: 10, paddingHorizontal: 12, borderRadius: 12 },
   actionText: { fontSize: 14, fontWeight: "600" as const, color: "#00D4FF" },
   deleteBtn: { padding: 4 },
+  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
+  modalKeyboard: { maxHeight: "90%" },
+  modalContent: { backgroundColor: "#FFFFFF", borderTopLeftRadius: 24, borderTopRightRadius: 24 },
+  modalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", padding: 20, borderBottomWidth: 1, borderBottomColor: "#E5E5EA" },
+  modalTitle: { fontSize: 22, fontWeight: "700" as const, color: "#000000" },
+  modalClose: { fontSize: 28, color: "#8E8E93", fontWeight: "300" as const },
 });
