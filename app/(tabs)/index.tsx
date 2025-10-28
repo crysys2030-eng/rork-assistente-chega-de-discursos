@@ -13,6 +13,7 @@ import {
   TextInput,
   Modal,
   Alert,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
@@ -105,15 +106,23 @@ function AgendaScreen() {
     setModalVisible(false);
   };
 
-  const handleDeleteItem = (id: string) => {
-    Alert.alert(
-      "Eliminar",
-      "Tem a certeza que deseja eliminar este item?",
-      [
-        { text: "Cancelar", style: "cancel" },
-        { text: "Eliminar", onPress: () => removeItem(id), style: "destructive" },
-      ]
-    );
+  const confirmAsync = React.useCallback((title: string, message: string) => {
+    return new Promise<boolean>((resolve) => {
+      if (Platform.OS === 'web') {
+        const ok = globalThis.confirm ? globalThis.confirm(`${title}\n\n${message}`) : true;
+        resolve(ok);
+        return;
+      }
+      Alert.alert(title, message, [
+        { text: 'Cancelar', style: 'cancel', onPress: () => resolve(false) },
+        { text: 'Eliminar', style: 'destructive', onPress: () => resolve(true) },
+      ]);
+    });
+  }, []);
+
+  const handleDeleteItem = async (id: string) => {
+    const ok = await confirmAsync('Eliminar', 'Tem a certeza que deseja eliminar este item?');
+    if (ok) removeItem(id);
   };
 
   const sortedItems = [...items].sort((a, b) => {

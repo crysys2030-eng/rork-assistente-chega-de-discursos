@@ -244,15 +244,23 @@ A minuta deve ser:
     }
   };
 
-  const handleDelete = (id: string) => {
-    Alert.alert("Confirmar", "Deseja eliminar esta minuta?", [
-      { text: "Cancelar", style: "cancel" },
-      {
-        text: "Eliminar",
-        style: "destructive",
-        onPress: () => removeMinute(id),
-      },
-    ]);
+  const confirmAsync = useCallback((title: string, message: string) => {
+    return new Promise<boolean>((resolve) => {
+      if (Platform.OS === 'web') {
+        const ok = globalThis.confirm ? globalThis.confirm(`${title}\n\n${message}`) : true;
+        resolve(ok);
+        return;
+      }
+      Alert.alert(title, message, [
+        { text: 'Cancelar', style: 'cancel', onPress: () => resolve(false) },
+        { text: 'Eliminar', style: 'destructive', onPress: () => resolve(true) },
+      ]);
+    });
+  }, []);
+
+  const handleDelete = async (id: string) => {
+    const ok = await confirmAsync('Confirmar', 'Deseja eliminar esta minuta?');
+    if (ok) removeMinute(id);
   };
 
   const handleCopy = async (text: string, id: string) => {

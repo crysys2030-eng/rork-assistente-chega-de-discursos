@@ -125,23 +125,27 @@ Não inclua títulos ou metadados no discurso, apenas o texto pronto a ser lido.
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleDeleteSpeech = () => {
-    Alert.alert(
-      "Eliminar Discurso",
-      "Deseja eliminar o discurso gerado?",
-      [
-        { text: "Cancelar", style: "cancel" },
-        {
-          text: "Eliminar",
-          style: "destructive",
-          onPress: () => {
-            setGeneratedSpeech("");
-            setSources([]);
-            setShowSpeech(false);
-          },
-        },
-      ]
-    );
+  const confirmAsync = React.useCallback((title: string, message: string) => {
+    return new Promise<boolean>((resolve) => {
+      if (Platform.OS === 'web') {
+        const ok = globalThis.confirm ? globalThis.confirm(`${title}\n\n${message}`) : true;
+        resolve(ok);
+        return;
+      }
+      Alert.alert(title, message, [
+        { text: 'Cancelar', style: 'cancel', onPress: () => resolve(false) },
+        { text: 'Eliminar', style: 'destructive', onPress: () => resolve(true) },
+      ]);
+    });
+  }, []);
+
+  const handleDeleteSpeech = async () => {
+    const ok = await confirmAsync('Eliminar Discurso', 'Deseja eliminar o discurso gerado?');
+    if (ok) {
+      setGeneratedSpeech("");
+      setSources([]);
+      setShowSpeech(false);
+    }
   };
 
   return (

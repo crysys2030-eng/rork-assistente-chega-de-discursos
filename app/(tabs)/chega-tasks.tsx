@@ -30,6 +30,7 @@ import {
   TouchableOpacity,
   Modal,
   Alert,
+  Platform,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
@@ -166,6 +167,19 @@ const [TasksContext, useTasks] = createContextHook(() => {
 });
 
 function TasksScreen() {
+  const confirmAsync = useCallback((title: string, message: string) => {
+    return new Promise<boolean>((resolve) => {
+      if (Platform.OS === 'web') {
+        const ok = globalThis.confirm ? globalThis.confirm(`${title}\n\n${message}`) : true;
+        resolve(ok);
+        return;
+      }
+      Alert.alert(title, message, [
+        { text: 'Cancelar', style: 'cancel', onPress: () => resolve(false) },
+        { text: 'Eliminar', style: 'destructive', onPress: () => resolve(true) },
+      ]);
+    });
+  }, []);
   const insets = useSafeAreaInsets();
   const { taskLists, addTaskList, updateTaskList, removeTaskList } = useTasks();
   const [showCategoryModal, setShowCategoryModal] = useState(false);
@@ -282,35 +296,25 @@ function TasksScreen() {
     updateTaskList(taskListId, updatedTaskList);
   };
 
-  const deleteTaskList = (id: string) => {
-    Alert.alert("Confirmar", "Deseja eliminar esta lista de tarefas?", [
-      { text: "Cancelar", style: "cancel" },
-      {
-        text: "Eliminar",
-        style: "destructive",
-        onPress: () => removeTaskList(id),
-      },
-    ]);
+  const deleteTaskList = async (id: string) => {
+    const ok = await confirmAsync('Confirmar', 'Deseja eliminar esta lista de tarefas?');
+    if (ok) {
+      removeTaskList(id);
+    }
   };
 
-  const deleteTask = (taskListId: string, taskId: string) => {
+  const deleteTask = async (taskListId: string, taskId: string) => {
     const taskList = taskLists.find((tl) => tl.id === taskListId);
     if (!taskList) return;
 
-    Alert.alert("Confirmar", "Deseja eliminar esta tarefa?", [
-      { text: "Cancelar", style: "cancel" },
-      {
-        text: "Eliminar",
-        style: "destructive",
-        onPress: () => {
-          const updatedTaskList: TaskList = {
-            ...taskList,
-            tasks: taskList.tasks.filter((task) => task.id !== taskId),
-          };
-          updateTaskList(taskListId, updatedTaskList);
-        },
-      },
-    ]);
+    const ok = await confirmAsync('Confirmar', 'Deseja eliminar esta tarefa?');
+    if (ok) {
+      const updatedTaskList: TaskList = {
+        ...taskList,
+        tasks: taskList.tasks.filter((task) => task.id !== taskId),
+      };
+      updateTaskList(taskListId, updatedTaskList);
+    }
   };
 
   const getTaskListProgress = (taskList: TaskList) => {
