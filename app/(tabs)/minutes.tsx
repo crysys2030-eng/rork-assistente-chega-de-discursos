@@ -74,10 +74,17 @@ const [MinutesContext, useMinutes] = createContextHook(() => {
       const stored = await AsyncStorage.getItem("minutes");
       if (!stored) return [];
       const parsed = JSON.parse(stored);
-      return parsed.map((m: Minute) => ({
+      return parsed.map((m: any) => ({
         ...m,
-        createdAt: new Date(m.createdAt),
-        taskList: m.taskList || [],
+        createdAt: new Date(m?.createdAt ?? Date.now()),
+        attendees: Array.isArray(m?.attendees) ? m.attendees : [],
+        topics: Array.isArray(m?.topics) ? m.topics : [],
+        tasks: Array.isArray(m?.tasks) ? m.tasks : [],
+        taskList: Array.isArray(m?.taskList) ? m.taskList : [],
+        title: m?.title ?? "",
+        date: m?.date ?? "",
+        summary: m?.summary ?? "",
+        id: String(m?.id ?? Date.now()),
       }));
     },
   });
@@ -258,10 +265,10 @@ A minuta deve ser:
     let text = `MINUTA DE REUNIÃO\n\n`;
     text += `Título: ${minute.title}\n`;
     text += `Data: ${minute.date}\n\n`;
-    text += `PARTICIPANTES:\n${minute.attendees.map((a) => `- ${a}`).join("\n")}\n\n`;
-    text += `TÓPICOS DISCUTIDOS:\n${minute.topics.map((t) => `- ${t}`).join("\n")}\n\n`;
+    text += `PARTICIPANTES:\n${(minute.attendees ?? []).map((a) => `- ${a}`).join("\n")}\n\n`;
+    text += `TÓPICOS DISCUTIDOS:\n${(minute.topics ?? []).map((t) => `- ${t}`).join("\n")}\n\n`;
     text += `RESUMO:\n${minute.summary}\n\n`;
-    text += `TAREFAS E AÇÕES:\n${minute.tasks
+    text += `TAREFAS E AÇÕES:\n${(minute.tasks ?? [])
       .map(
         (t, i) =>
           `${i + 1}. ${t.task}\n   Prioridade: ${t.priority.toUpperCase()}${
@@ -434,7 +441,7 @@ A minuta deve ser:
                           </Text>
                           <CheckSquare size={12} color="#00D4FF" />
                           <Text style={styles.minuteMetaText}>
-                            {minute.tasks.length} tarefas
+                            {(minute.tasks?.length ?? 0)} tarefas
                           </Text>
                         </View>
                       </View>
@@ -452,7 +459,7 @@ A minuta deve ser:
                         <Text style={styles.sectionTitle}>
                           👥 Participantes
                         </Text>
-                        {minute.attendees.map((attendee, i) => (
+                        {(minute.attendees ?? []).map((attendee, i) => (
                           <Text key={i} style={styles.listItem}>
                             • {attendee}
                           </Text>
@@ -461,7 +468,7 @@ A minuta deve ser:
 
                       <View style={styles.section}>
                         <Text style={styles.sectionTitle}>📋 Tópicos</Text>
-                        {minute.topics.map((topic, i) => (
+                        {(minute.topics ?? []).map((topic, i) => (
                           <Text key={i} style={styles.listItem}>
                             • {topic}
                           </Text>
@@ -477,7 +484,7 @@ A minuta deve ser:
                         <Text style={styles.sectionTitle}>
                           ✅ Tarefas e Ações
                         </Text>
-                        {minute.tasks.map((task, i) => (
+                        {(minute.tasks ?? []).map((task, i) => (
                           <View key={i} style={styles.taskCard}>
                             <View style={styles.taskHeader}>
                               <View
