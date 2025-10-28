@@ -85,17 +85,17 @@ export async function generateObject<TSchema extends z.ZodType<any>>(
   const prompt = extractPrompt(params.messages);
 
   if (/\b(t[íi]tulo|palavras?[- ]?chave|temas?)\b/i.test(prompt)) {
-    const baseTitle = uniqueTitle("Mensagem à Comunicação Social");
-    const kw = ["pluralismo", "responsabilidade", "Portugal", "transparência", "segurança", "economia"].slice(0, 6);
-    const content = buildLocalSpeech(prompt);
-    const result: any = { title: baseTitle, keywords: kw, content };
+    const kws = parseKeywords(prompt);
+    const title = uniqueTitleFromKeywords(kws);
+    const content = buildLocalSpeech(prompt, kws);
+    const result: any = { title, keywords: kws, content };
     return result as z.infer<TSchema>;
   }
 
   if (/\b(discurso|speech)\b/i.test(prompt)) {
-    const title = uniqueTitle("Discurso ao País");
-    const content = buildLocalSpeech(prompt);
-    const keywords = ["Portugal", "valores", "economia", "famílias", "segurança", "confiança"];
+    const title = uniqueTitleFromKeywords([]);
+    const content = buildLocalSpeech(prompt, []);
+    const keywords = suggestKeywords(content);
     const result: any = { title, content, keywords };
     return result as z.infer<TSchema>;
   }
@@ -134,21 +134,126 @@ function extractPrompt(
   return parts.join("\n\n");
 }
 
-function buildLocalSpeech(topic: string): string {
-  const theme = topic.replace(/\s+/g, " ").slice(0, 160);
-  const header = "Portugueses e Portuguesas,";
-  const para1 = `Hoje, com clareza e respeito, falamos de ${theme}. O nosso compromisso é com a verdade, com a segurança das pessoas, com a economia que cria oportunidades e com o mérito de quem trabalha.`;
-  const para2 = `Queremos um Estado que funcione: serviços públicos próximos, justiça célere, apoio real às famílias e liberdade para empreender. Combateremos privilégios, ineficiências e a corrupção que mina a confiança.`;
-  const para3 = `Propomos metas concretas: reduzir prazos de resposta do Estado, aliviar a carga fiscal sobre o trabalho, apoiar PME e qualificar a administração. Transparência total, contas certas e avaliação de resultados.`;
-  const close = "Juntos, com coragem e responsabilidade, construiremos um Portugal mais justo. Muito obrigado.";
-  return [header, "", para1, "", para2, "", para3, "", close].join("\n");
+function rand(seed: number) {
+  let s = Math.abs(seed) % 2147483647;
+  return () => (s = (s * 48271) % 2147483647) / 2147483647;
 }
 
-function uniqueTitle(base: string): string {
+function parseKeywords(text: string): string[] {
+  const m = text.match(/palavras[^:]*:\s*([^\n]+)/i);
+  if (!m) return [];
+  return m[1]
+    .split(',')
+    .map((k) => k.trim())
+    .filter((k) => k.length > 0)
+    .slice(0, 12);
+}
+
+function uniqueTitleFromKeywords(kws: string[]): string {
+  const base = kws.length > 0 ? `${capitalize(kws[0])}: Compromisso com Portugal` : "Discurso ao País";
   const ts = new Date();
   const pad = (n: number) => String(n).padStart(2, "0");
   const stamp = `${ts.getFullYear()}${pad(ts.getMonth() + 1)}${pad(ts.getDate())}-${pad(ts.getHours())}${pad(ts.getMinutes())}`;
   return `${base} ${stamp}`;
+}
+
+function suggestKeywords(content: string): string[] {
+  const pool = [
+    "Portugal",
+    "economia",
+    "famílias",
+    "saúde",
+    "educação",
+    "segurança",
+    "justiça",
+    "PME",
+    "confiança",
+    "transparência",
+    "inovação",
+    "meritocracia",
+  ];
+  const picked: string[] = [];
+  for (const w of pool) if (content.toLowerCase().includes(w)) picked.push(w);
+  return picked.slice(0, 10);
+}
+
+function buildLocalSpeech(topic: string, kws: string[] = []): string {
+  const seed = Date.now();
+  const rnd = rand(seed);
+  const theme = topic.replace(/\s+/g, " ").slice(0, 160);
+  const openings = [
+    "Portugueses e Portuguesas,",
+    "Amigos, compatriotas,",
+    "Boa noite a todos,",
+    "Caros concidadãos,",
+  ];
+  const opening = openings[Math.floor(rnd() * openings.length)];
+  const focus = kws.length > 0 ? `com foco em ${kws.join(", ")}` : "";
+  const p1 = `${opening}\nHoje falamos de ${theme} ${focus}. O nosso compromisso é simples: dignidade para as pessoas, oportunidades para quem trabalha e confiança nas instituições.`;
+  const axes = buildAxes(kws, rnd);
+  const p2 = `Três eixos de ação: ${axes.join("; ")}. Cada medida terá calendário, metas públicas e avaliação independente.`;
+  const p3 = buildMeasures(kws, rnd);
+  const closing = buildClosing(kws, rnd);
+  return [p1, "", p2, "", p3, "", closing].join("\n");
+}
+
+function buildAxes(kws: string[], rnd: () => number): string[] {
+  const options = [
+    "contas certas e transparência",
+    "serviços públicos próximos e digitais",
+    "alívio fiscal ao trabalho e às PME",
+    "segurança nas ruas e justiça célere",
+    "crescimento com inovação e qualificação",
+    "apoio às famílias e habitação acessível",
+  ];
+  const list = [...options];
+  const result: string[] = [];
+  for (let i = 0; i < 4 && list.length; i++) {
+    const idx = Math.floor(rnd() * list.length);
+    result.push(list.splice(idx, 1)[0]);
+  }
+  if (kws.length > 0) result[0] = `${result[0]} — ${kws.slice(0, 3).join(", ")}`;
+  return result.slice(0, 3);
+}
+
+function buildMeasures(kws: string[], rnd: () => number): string {
+  const pick = <T,>(arr: T[], n: number) => {
+    const a = [...arr];
+    const out: T[] = [];
+    for (let i = 0; i < n && a.length; i++) out.push(a.splice(Math.floor(rnd() * a.length), 1)[0]);
+    return out;
+  };
+  const measures = [
+    "reduzir prazos de resposta do Estado",
+    "simplificar licenças e cortar burocracia",
+    "linha de apoio a PME exportadoras",
+    "médico de família para todos",
+    "programa nacional de literacia digital",
+    "reforço da polícia de proximidade",
+    "acordo fiscal para jovens trabalhadores",
+    "transparência total nas compras públicas",
+  ];
+  const chosen = pick(measures, 4);
+  const withKw = kws.slice(0, 4).map((k) => `prioridade em ${k}`);
+  const bullets = [...chosen, ...withKw].slice(0, 5).map((t) => `• ${capitalize(t)}`).join("\n");
+  return `Plano imediato:\n${bullets}`;
+}
+
+function buildClosing(kws: string[], rnd: () => number): string {
+  const closings = [
+    "Com trabalho sério e coragem, faremos um Portugal mais justo.",
+    "Sem promessas vazias: resultados, respeito e futuro.",
+    "É tempo de unir o país em torno de objetivos claros.",
+    "Com cada um de vós, vamos transformar expectativas em conquistas.",
+  ];
+  let c = closings[Math.floor(rnd() * closings.length)];
+  if (kws.length) c += ` Pelas ${kws[0]} e pelas futuras gerações.`;
+  return c + " Muito obrigado.";
+}
+
+function capitalize(s: string): string {
+  if (!s) return s;
+  return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
 function buildLocalSources() {
