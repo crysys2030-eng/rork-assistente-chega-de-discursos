@@ -1,8 +1,8 @@
 import createContextHook from "@nkzw/create-context-hook";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Stack, useRouter } from "expo-router";
-import { Plus, Calendar, Mic, Users, Trash2, Sparkles } from "lucide-react-native";
+import { Stack } from "expo-router";
+import { Plus, Calendar, Users, Trash2 } from "lucide-react-native";
 import React, { useState, useEffect } from "react";
 import {
   StyleSheet,
@@ -20,7 +20,6 @@ import { LinearGradient } from "expo-linear-gradient";
 
 interface AgendaItem {
   id: string;
-  type: "meeting" | "speech";
   title: string;
   date: string;
   time: string;
@@ -68,11 +67,9 @@ const [AgendaContext, useAgenda] = createContextHook(() => {
 });
 
 function AgendaScreen() {
-  const router = useRouter();
   const { items, addItem, removeItem } = useAgenda();
   const [modalVisible, setModalVisible] = useState(false);
   const [newItem, setNewItem] = useState<Partial<AgendaItem>>({
-    type: "meeting",
     title: "",
     date: "",
     time: "",
@@ -88,16 +85,14 @@ function AgendaScreen() {
 
     addItem({
       id: Date.now().toString(),
-      type: newItem.type as "meeting" | "speech",
-      title: newItem.title,
-      date: newItem.date,
-      time: newItem.time,
+      title: newItem.title!,
+      date: newItem.date!,
+      time: newItem.time!,
       location: newItem.location,
       notes: newItem.notes,
     });
 
     setNewItem({
-      type: "meeting",
       title: "",
       date: "",
       time: "",
@@ -143,7 +138,7 @@ function AgendaScreen() {
           <View style={styles.headerContent}>
             <View>
               <Text style={styles.headerTitle}>📅 Agenda</Text>
-              <Text style={styles.headerSubtitle}>Reuniões e Discursos</Text>
+              <Text style={styles.headerSubtitle}>Reuniões</Text>
             </View>
             <LinearGradient
               colors={["#00D4FF", "#0099CC"]}
@@ -161,32 +156,12 @@ function AgendaScreen() {
       </LinearGradient>
 
       <ScrollView style={styles.scrollView}>
-        <View style={styles.quickActions}>
-          <LinearGradient colors={["#E94E1B", "#FF7A45"]} style={styles.quickCard}>
-            <TouchableOpacity
-              onPress={() => {
-                console.log("navigate -> /(tabs)/speech");
-                router.push("/ai-speech");
-              }}
-              style={styles.quickCardInner}
-              testID="go-generate-speech"
-            >
-              <View style={styles.quickIconWrap}>
-                <Sparkles size={22} color="#FFFFFF" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.quickTitle}>Gerar Discurso (IA)</Text>
-                <Text style={styles.quickSubtitle}>Crie um discurso com palavras‑chave e conformidade PT</Text>
-              </View>
-            </TouchableOpacity>
-          </LinearGradient>
-        </View>
         {sortedItems.length === 0 ? (
           <View style={styles.emptyState}>
             <Calendar size={64} color="#C7C7CC" />
             <Text style={styles.emptyTitle}>Sem eventos agendados</Text>
             <Text style={styles.emptySubtitle}>
-              Adicione reuniões e discursos à sua agenda
+              Adicione as suas reuniões à agenda
             </Text>
           </View>
         ) : (
@@ -199,16 +174,10 @@ function AgendaScreen() {
               >
                 <View style={styles.itemHeader}>
                   <View style={styles.itemTypeIcon}>
-                    {item.type === "meeting" ? (
-                      <Users size={20} color="#FFFFFF" />
-                    ) : (
-                      <Mic size={20} color="#FFFFFF" />
-                    )}
+                    <Users size={20} color="#FFFFFF" />
                   </View>
                   <View style={styles.itemHeaderText}>
-                    <Text style={styles.itemType}>
-                      {item.type === "meeting" ? "Reunião" : "Discurso"}
-                    </Text>
+                    <Text style={styles.itemType}>Reunião</Text>
                     <Text style={styles.itemTitle}>{item.title}</Text>
                   </View>
                   <TouchableOpacity
@@ -251,47 +220,6 @@ function AgendaScreen() {
             </View>
 
             <ScrollView style={styles.modalForm}>
-              <View style={styles.typeSelector}>
-                <LinearGradient
-                  colors={newItem.type === "meeting" ? ["#00D4FF", "#0099CC"] : ["#E5E5EA", "#F5F5F7"]}
-                  style={styles.typeButton}
-                >
-                  <TouchableOpacity
-                    style={styles.typeButtonInner}
-                    onPress={() => setNewItem({ ...newItem, type: "meeting" })}
-                  >
-                    <Users size={20} color={newItem.type === "meeting" ? "#FFFFFF" : "#000000"} />
-                    <Text
-                      style={[
-                        styles.typeButtonText,
-                        newItem.type === "meeting" && styles.typeButtonTextActive,
-                      ]}
-                    >
-                      Reunião
-                    </Text>
-                  </TouchableOpacity>
-                </LinearGradient>
-                <LinearGradient
-                  colors={newItem.type === "speech" ? ["#00D4FF", "#0099CC"] : ["#E5E5EA", "#F5F5F7"]}
-                  style={styles.typeButton}
-                >
-                  <TouchableOpacity
-                    style={styles.typeButtonInner}
-                    onPress={() => setNewItem({ ...newItem, type: "speech" })}
-                  >
-                    <Mic size={20} color={newItem.type === "speech" ? "#FFFFFF" : "#000000"} />
-                    <Text
-                      style={[
-                        styles.typeButtonText,
-                        newItem.type === "speech" && styles.typeButtonTextActive,
-                      ]}
-                    >
-                      Discurso
-                    </Text>
-                  </TouchableOpacity>
-                </LinearGradient>
-              </View>
-
               <View style={styles.formSection}>
                 <Text style={styles.label}>Título *</Text>
                 <TextInput
@@ -425,41 +353,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#0f0f23",
   },
-  quickActions: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-  },
-  quickCard: {
-    borderRadius: 16,
-    shadowColor: "#E94E1B",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
-    elevation: 6,
-  },
-  quickCardInner: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    padding: 16,
-  },
-  quickIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "rgba(255,255,255,0.2)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  quickTitle: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "700" as const,
-  },
-  quickSubtitle: {
-    color: "#FFE6DE",
-    fontSize: 12,
-  },
   emptyState: {
     flex: 1,
     justifyContent: "center",
@@ -570,35 +463,6 @@ const styles = StyleSheet.create({
   modalForm: {
     padding: 20,
     maxHeight: 500,
-  },
-  typeSelector: {
-    flexDirection: "row",
-    gap: 12,
-    marginBottom: 20,
-  },
-  typeButton: {
-    flex: 1,
-    borderRadius: 12,
-    shadowColor: "#00D4FF",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  typeButtonInner: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    paddingVertical: 14,
-  },
-  typeButtonText: {
-    fontSize: 16,
-    fontWeight: "600" as const,
-    color: "#000000",
-  },
-  typeButtonTextActive: {
-    color: "#FFFFFF",
   },
   formSection: {
     marginBottom: 16,
