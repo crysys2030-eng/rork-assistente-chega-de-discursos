@@ -19,7 +19,7 @@ export type RorkMessage = {
 
 export function useRorkAgent(_params: { tools: Record<string, unknown> }) {
   const [messages, setMessages] = useState<RorkMessage[]>([]);
-  const error = useMemo(() => new Error("AI está desativada neste deploy (sem Backend)"), []);
+  const error = useMemo(() => null, []);
 
   const sendMessage = useCallback(async (input: string | { text: string }) => {
     const text = typeof input === "string" ? input : input.text;
@@ -28,19 +28,14 @@ export function useRorkAgent(_params: { tools: Record<string, unknown> }) {
       role: "user",
       parts: [{ type: "text", text }],
     };
+
+    const reply = createLocalReply(text);
     const assistantMsg: RorkMessage = {
       id: `${Date.now()}-assistant`,
       role: "assistant",
-      parts: [
-        {
-          type: "tool",
-          state: "output-error",
-          toolName: "ai",
-          errorText:
-            "AI indisponível neste ambiente. Ative Backend no topo para usar funcionalidades de IA.",
-        },
-      ],
+      parts: [{ type: "text", text: reply }],
     };
+
     setMessages((prev) => [...prev, userMsg, assistantMsg]);
   }, []);
 
@@ -63,6 +58,15 @@ export function useRorkAgent(_params: { tools: Record<string, unknown> }) {
   return { messages, error, sendMessage, addToolResult, setMessages };
 }
 
+function createLocalReply(input: string): string {
+  const base = "Modo IA Local (offline)";
+  const advice =
+    "Estou a funcionar sem servidor de IA. Para respostas mais avançadas, ative Backend no topo e refaça o deploy.";
+  const normalized = input.trim().replace(/\s+/g, " ");
+  const summary = normalized.length > 220 ? normalized.slice(0, 220) + "…" : normalized;
+  return `${base}: percebi a sua questão — \"${summary}\". ${advice}`;
+}
+
 export function createRorkTool<TInput>(_config: {
   description: string;
   zodSchema: z.ZodType<TInput>;
@@ -71,23 +75,94 @@ export function createRorkTool<TInput>(_config: {
   return {} as unknown;
 }
 
-export async function generateObject<TSchema extends z.ZodType<any>>(_params: {
-  messages: { role: "user" | "assistant"; content: string | { type: "text"; text: string }[] }[];
-  schema: TSchema;
-}): Promise<z.infer<TSchema>> {
-  const err = new Error(
-    "AI generation is unavailable in this deployment. Enable Backend in the header to use AI features."
+export async function generateObject<TSchema extends z.ZodType<any>>(
+  params: {
+    messages: { role: "user" | "assistant"; content: string | { type: "text"; text: string }[] }[];
+    schema: TSchema;
+  }
+): Promise<z.infer<TSchema>> {
+  console.warn("rork-sdk-shim.generateObject: using local fallback");
+  const prompt = extractPrompt(params.messages);
+
+  if (/discurso|speech/i.test(prompt)) {
+    const result: any = {
+      speech: buildLocalSpeech(prompt),
+      sources: buildLocalSources(),
+    };
+    return result as z.infer<TSchema>;
+  }
+
+  if (/tarefas|lista de tarefas|task list/i.test(prompt)) {
+    const result: any = buildLocalTaskList(prompt);
+    return result as z.infer<TSchema>;
+  }
+
+  throw new Error(
+    "IA local não consegue gerar este tipo de conteúdo. Ative Backend para capacidades completas."
   );
-  console.warn("rork-sdk-shim.generateObject called without backend", _params);
-  throw err;
 }
 
 export async function generateText(
-  _params: string | { messages: { role: "user" | "assistant"; content: string }[] }
+  params: string | { messages: { role: "user" | "assistant"; content: string }[] }
 ): Promise<string> {
-  const err = new Error(
-    "AI generation is unavailable in this deployment. Enable Backend in the header to use AI features."
-  );
-  console.warn("rork-sdk-shim.generateText called without backend", _params);
-  throw err;
+  console.warn("rork-sdk-shim.generateText: using local fallback");
+  const prompt = typeof params === "string" ? params : params.messages.map((m) => m.content).join("\n\n");
+  return createLocalReply(prompt);
+}
+
+function extractPrompt(
+  msgs: { role: "user" | "assistant"; content: string | { type: "text"; text: string }[] }[]
+): string {
+  const parts: string[] = [];
+  for (const m of msgs) {
+    if (typeof m.content === "string") parts.push(m.content);
+    else parts.push(m.content.map((p) => (p as any).text ?? "").join("\n"));
+  }
+  return parts.join("\n\n");
+}
+
+function buildLocalSpeech(topic: string): string {
+  const now = new Date();
+  const header = "Portugueses e Portuguesas,";
+  const body = `Hoje falamos de ${topic.replace(/\n+/g, " ").slice(0, 120)}. Defendemos Portugal, a nossa identidade e a autoridade do Estado. Combateremos a corrupção, protegeremos as famílias e daremos voz a quem trabalha e cumpre.`;
+  const close = "Juntos, com coragem e verdade, faremos um Portugal mais justo. Muito obrigado.";
+  return [header, "", body, "", close].join("\n");
+}
+
+function buildLocalSources() {
+  return [
+    {
+      title: "Constituição da República Portuguesa",
+      url: "https://dre.pt/legislacao-consolidada/",
+      relevance: "Enquadra princípios de soberania e organização do Estado",
+    },
+    {
+      title: "Instituto Nacional de Estatística (INE)",
+      url: "https://www.ine.pt/",
+      relevance: "Dados oficiais para fundamentar indicadores citados",
+    },
+  ];
+}
+
+function buildLocalTaskList(topic: string) {
+  const title = "Plano Operacional — Tarefas Prioritárias";
+  const description = "Conjunto de ações concretas e mensuráveis para execução imediata";
+  const baseTask = (t: string, p: "high" | "medium" | "low" = "medium") => ({
+    title: t,
+    description: `${t} — detalhar responsáveis, prazos e métricas de sucesso`,
+    priority: p,
+    deadline: "2 semanas",
+    assignedTo: "Equipa",
+  });
+  const tasks = [
+    baseTask("Definir objetivos e KPIs", "high"),
+    baseTask("Mapear stakeholders-chave", "high"),
+    baseTask("Plano de comunicação multicanal", "high"),
+    baseTask("Calendário de execução semanal", "medium"),
+    baseTask("Mecanismo de monitorização e reporting", "medium"),
+    baseTask("Checklist de conformidade legal"),
+    baseTask("Reunião de arranque e atribuição de responsáveis", "high"),
+    baseTask("Roadmap de riscos e mitigação", "medium"),
+  ];
+  return { title, description, tasks };
 }
