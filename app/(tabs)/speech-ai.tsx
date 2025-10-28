@@ -177,7 +177,7 @@ function SpeechAIScreen() {
 
   const handleExport = async (d: SpeechDraft) => {
     const fileName = `discurso_${d.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_${Date.now()}.txt`;
-    const content = `TÍTULO: ${d.title}\n\nPALAVRAS‑CHAVE: ${d.keywords.join(", ")}\nPÚBLICO‑ALVO: ${d.audience}\nTOM: ${d.tone}\nDURAÇÃO: ${d.durationMinutes} min\n\nESBOÇO:\n${d.outline.map((o, i) => `${i + 1}. ${o}`).join("\n")}\n\nDISCURSO:\n${d.speech}`;
+    const content = `TÍTULO: ${d.title}\n\nPALAVRAS‑CHAVE: ${d.keywords.join(", ")}\nPÚBLICO‑ALVO: ${d.audience}\nTOM: ${d.tone}\nDURAÇÃO: ${d.durationMinutes} min\n\nESBOÇO:\n${(Array.isArray(d.outline) ? d.outline : []).map((o, i) => `${i + 1}. ${o}`).join("\n")}\n\nDISCURSO:\n${d.speech}`;
 
     try {
       if (Platform.OS === 'web') {
@@ -317,7 +317,7 @@ function SpeechAIScreen() {
 
                   <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Esboço</Text>
-                    {d.outline.map((o, i) => (
+                    {(Array.isArray(d.outline) ? d.outline : []).map((o, i) => (
                       <Text key={`${d.id}-o-${i}`} style={styles.listItem}>• {o}</Text>
                     ))}
                   </View>
