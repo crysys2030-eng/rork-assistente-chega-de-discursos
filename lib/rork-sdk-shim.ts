@@ -84,10 +84,29 @@ export async function generateObject<TSchema extends z.ZodType<any>>(
   console.warn("rork-sdk-shim.generateObject: using local fallback");
   const prompt = extractPrompt(params.messages);
 
+  if (/\b(t[íi]tulo|palavras?[- ]?chave|temas?)\b/i.test(prompt)) {
+    const baseTitle = "Mensagem à Comunicação Social";
+    const kw = ["pluralismo", "responsabilidade", "Portugal", "transparência", "segurança", "economia"].slice(0, 5);
+    const result: any = { title: baseTitle, keywords: kw };
+    return result as z.infer<TSchema>;
+  }
+
   if (/\b(discurso|speech)\b/i.test(prompt)) {
+    const outline = [
+      "Abertura e enquadramento legal",
+      "Diagnóstico com dados verificados",
+      "Compromissos específicos e mensuráveis",
+      "Garantias de transparência e responsabilidade",
+      "Apelo final à participação cívica",
+    ];
     const result: any = {
+      outline,
       speech: buildLocalSpeech(prompt),
-      sources: buildLocalSources(),
+      compliance_notes: [
+        "Respeito pelo pluralismo e direitos fundamentais",
+        "Ausência de incitação ao ódio ou discriminação",
+        "Compromissos verificáveis e baseados em fontes públicas",
+      ],
     };
     return result as z.infer<TSchema>;
   }
