@@ -4,7 +4,7 @@ import createContextHook from "@nkzw/create-context-hook";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
-import { Megaphone, Loader2, Sparkles, Copy, Check, Trash2 } from "lucide-react-native";
+import { Megaphone, Loader2, Sparkles, Copy, Check, Trash2, RotateCw } from "lucide-react-native";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert,
@@ -92,6 +92,10 @@ function SpeechAIScreen() {
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [showManualModal, setShowManualModal] = useState<boolean>(false);
+  const [tone, setTone] = useState<string>("");
+  const [length, setLength] = useState<string>("");
+  const [audience, setAudience] = useState<string>("");
+  const [language, setLanguage] = useState<string>("pt-PT");
 
   const existingTitles = useMemo(() => speeches.map((s) => s.title).filter(Boolean), [speeches]);
 
@@ -133,16 +137,40 @@ function SpeechAIScreen() {
         content: z.string().describe("Discurso completo apenas em texto, pronto para leitura em palco")
       });
 
-      const prompt = `Gera um discurso político 100% criado por IA, em português europeu, moderno e persuasivo.
-- Usa estas palavras‑chave obrigatórias: ${rawKeywords.join(', ')}
-- O tema, estrutura e ideias devem ser definidos pela IA.
-- O título NÃO pode repetir nenhum existente: ${existingTitles.join(', ') || 'nenhum'}
-- Apenas DEVOLVE TEXTO do discurso e um título (sem listas técnicas, sem explicações, sem marcações markdown).
-- Traz: abertura impactante, 3-5 secções com narrativa coerente, conclusão mobilizadora.
-- Tom: assertivo, claro, democrático, orientado a valores e propostas concretas.
-- Evita linguagem ofensiva e generalizações.`;
+      const preferences = [
+        tone ? `Tom preferido: ${tone}` : "Tom decidido pela IA",
+        length ? `Extensão: ${length}` : "Extensão escolhida pela IA",
+        audience ? `Audiência: ${audience}` : "Audiência definida pela IA",
+        `Idioma: ${language}`,
+      ].join("\n");
 
-      const result = await generateObject({ messages: [{ role: "user", content: prompt }], schema });
+      const basePrompt = `Gera um discurso político 100% criado por IA.
+${preferences}
+- Usa estas palavras‑chave obrigatórias: ${rawKeywords.join(', ')}
+- O tema, estrutura e ideias podem ser definidos pela IA.
+- O título NÃO pode repetir nenhum existente: ${existingTitles.join(', ') || 'nenhum'}
+- Devolve APENAS o título e o discurso em texto corrido, sem listas nem markdown.
+- Estrutura: abertura impactante, 3–5 secções com narrativa coerente, conclusão mobilizadora.
+- Evita conteúdos vazios e repetições. Sê específico e varia a linguagem.`;
+
+      let attempt = 0;
+      let result: { title: string; content: string } | null = null;
+
+      while (attempt < 2) {
+        const prompt = attempt === 0 ? basePrompt : `${basePrompt}\n- Reescreve com variação de ideias, metáforas novas e exemplos diferentes.`;
+        const r = await generateObject({ messages: [{ role: "user", content: prompt }], schema });
+        const contentOk = typeof r.content === 'string' && r.content.trim().length > 200;
+        const duplicate = speeches.some((s) => s.content.trim() === r.content.trim());
+        if (contentOk && !duplicate) {
+          result = r;
+          break;
+        }
+        attempt += 1;
+      }
+
+      if (!result) {
+        throw new Error("Conteúdo vazio");
+      }
 
       const speech: Speech = {
         id: Date.now().toString(),
@@ -173,18 +201,20 @@ function SpeechAIScreen() {
         content: z.string(),
       });
 
-      const prompt = `Cria um discurso político 100% IA, tema escolhido por IA, único e não repetido.
+      const prompt = `Cria um discurso político 100% IA, com escolhas ótimas de tom, extensão, estrutura e audiência.
 - Não repitas títulos: ${existingTitles.join(', ') || 'nenhum'}
-- Devolve apenas texto do discurso e um título forte.
-- Inclui 6-10 palavras‑chave coerentes embebidas no conteúdo.`;
+- Devolve apenas o título e o discurso em texto corrido.
+- Garante conteúdo substantivo, concreto e sem repetições.`;
 
-      const result = await generateObject({ messages: [{ role: "user", content: prompt }], schema });
+      const r = await generateObject({ messages: [{ role: "user", content: prompt }], schema });
+      const contentOk = typeof r.content === 'string' && r.content.trim().length > 200;
+      if (!contentOk) throw new Error("Conteúdo vazio");
 
       const speech: Speech = {
         id: Date.now().toString(),
-        title: result.title,
-        keywords: Array.isArray(result.keywords) ? result.keywords : [],
-        content: result.content,
+        title: r.title,
+        keywords: Array.isArray(r.keywords) ? r.keywords : [],
+        content: r.content,
         createdAt: new Date(),
       };
 
@@ -212,7 +242,7 @@ function SpeechAIScreen() {
           <View style={styles.headerContent}>
             <View>
               <Text style={styles.headerTitle}>📣 Discurso IA</Text>
-              <Text style={styles.headerSubtitle}>Gerador online por palavras‑chave</Text>
+              <Text style={styles.headerSubtitle}>IA escolhe as melhores opções</Text>
             </View>
             <LinearGradient colors={["#E94E1B", "#D63E0F"]} style={styles.addButton}>
               <TouchableOpacity onPress={handleAutoGenerate} style={styles.addButtonTouchable} disabled={isGenerating}
@@ -250,6 +280,44 @@ function SpeechAIScreen() {
             placeholderTextColor="#8E8E93"
             testID="speech-ai-title-input"
           />
+
+          <View style={styles.prefsRow}>
+            <TextInput
+              style={[styles.input, styles.inputHalf]}
+              value={tone}
+              onChangeText={setTone}
+              placeholder="Tom (ex: inspirador)"
+              placeholderTextColor="#8E8E93"
+              testID="speech-ai-tone-input"
+            />
+            <TextInput
+              style={[styles.input, styles.inputHalf]}
+              value={length}
+              onChangeText={setLength}
+              placeholder="Extensão (curto/médio/longo)"
+              placeholderTextColor="#8E8E93"
+              testID="speech-ai-length-input"
+            />
+          </View>
+
+          <View style={styles.prefsRow}>
+            <TextInput
+              style={[styles.input, styles.inputHalf]}
+              value={audience}
+              onChangeText={setAudience}
+              placeholder="Audiência (ex: juventude)"
+              placeholderTextColor="#8E8E93"
+              testID="speech-ai-audience-input"
+            />
+            <TextInput
+              style={[styles.input, styles.inputHalf]}
+              value={language}
+              onChangeText={setLanguage}
+              placeholder="Idioma (ex: pt-PT)"
+              placeholderTextColor="#8E8E93"
+              testID="speech-ai-language-input"
+            />
+          </View>
 
           <LinearGradient colors={isGenerating ? ["#C7C7CC", "#8E8E93"] : ["#E94E1B", "#D63E0F"]} style={styles.generateButton}>
             <TouchableOpacity onPress={handleGenerate} style={styles.generateButtonInner} disabled={isGenerating} testID="speech-ai-generate">
@@ -296,6 +364,27 @@ function SpeechAIScreen() {
                     <TouchableOpacity style={styles.actionButton} onPress={() => handleCopy(`${s.title}\n\n${s.content}`, s.id)} testID={`speech-copy-${s.id}`}>
                       {copiedId === s.id ? <Check size={18} color="#34C759" /> : <Copy size={18} color="#00D4FF" />}
                       <Text style={styles.actionText}>{copiedId === s.id ? "Copiado" : "Copiar"}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.actionButton, { backgroundColor: "rgba(233, 78, 27, 0.2)" }]}
+                      onPress={async () => {
+                        setIsGenerating(true);
+                        try {
+                          const schema = z.object({ title: z.string(), content: z.string() });
+                          const prompt = `Reescreve o seguinte discurso com variação e maior profundidade mantendo as palavras‑chave: ${s.keywords.join(', ')}. Devolve apenas o texto e um título.\n\nTEXTO:\n${s.content}`;
+                          const r = await generateObject({ messages: [{ role: 'user', content: prompt }], schema });
+                          const speech: Speech = { id: Date.now().toString(), title: r.title, keywords: s.keywords, content: r.content, createdAt: new Date() };
+                          addSpeech(speech);
+                        } catch (err) {
+                          Alert.alert('Erro', 'Falha a regenerar.');
+                        } finally {
+                          setIsGenerating(false);
+                        }
+                      }}
+                      testID={`speech-regenerate-${s.id}`}
+                    >
+                      <RotateCw size={18} color="#E94E1B" />
+                      <Text style={[styles.actionText, { color: "#E94E1B" }]}>Regenerar</Text>
                     </TouchableOpacity>
                   </View>
                 </LinearGradient>
@@ -366,4 +455,6 @@ const styles = StyleSheet.create({
   modalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", padding: 20, borderBottomWidth: 1, borderBottomColor: "#E5E5EA" },
   modalTitle: { fontSize: 22, fontWeight: "700" as const, color: "#000000" },
   modalClose: { fontSize: 28, color: "#8E8E93", fontWeight: "300" as const },
+  prefsRow: { flexDirection: "row", gap: 12, marginTop: 12 },
+  inputHalf: { flex: 1 },
 });
