@@ -25,9 +25,9 @@ export default function TabLayout() {
       />
 
       <Tabs.Screen
-        name="speech"
+        name="ai-speech"
         options={{
-          title: "Discursos",
+          title: "IA Discursos",
           tabBarIcon: ({ color }) => <Mic color={color} size={24} />,
         }}
       />

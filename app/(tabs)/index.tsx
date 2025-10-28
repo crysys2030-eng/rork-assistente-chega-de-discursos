@@ -166,7 +166,7 @@ function AgendaScreen() {
             <TouchableOpacity
               onPress={() => {
                 console.log("navigate -> /(tabs)/speech");
-                router.push("/speech");
+                router.push("/ai-speech");
               }}
               style={styles.quickCardInner}
               testID="go-generate-speech"
