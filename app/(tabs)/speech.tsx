@@ -1,4 +1,4 @@
-import { generateObject } from "@/lib/rork-sdk-shim";
+import { generateObject } from "@/lib/ai-bridge";
 import { Stack } from "expo-router";
 import { Sparkles, Loader2, Copy, Check, ExternalLink, Trash2, Shield } from "lucide-react-native";
 import React, { useState } from "react";
