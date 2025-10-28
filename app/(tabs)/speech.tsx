@@ -108,7 +108,7 @@ Não inclua títulos ou metadados no discurso, apenas o texto pronto a ser lido.
     } catch (error) {
       console.error("Error generating speech:", error);
       const message = (error as Error)?.message ?? "Erro desconhecido";
-      if (message.includes("AI generation is unavailable") || message.toLowerCase().includes("ai")) {
+      if (message.includes("AI generation is unavailable")) {
         setAiError("A IA não está disponível neste deploy. Ative o Backend no topo para usar as funcionalidades de IA.");
       }
       Alert.alert("Erro", (error as Error)?.message?.includes("AI generation is unavailable")
@@ -243,9 +243,9 @@ Não inclua títulos ou metadados no discurso, apenas o texto pronto a ser lido.
               style={styles.generateButton}
             >
               <TouchableOpacity
-                style={[styles.generateButtonInner, aiError ? styles.generateButtonInnerDisabled : null]}
+                style={[styles.generateButtonInner]}
                 onPress={handleGenerate}
-                disabled={isGenerating || !!aiError}
+                disabled={isGenerating}
                 testID="generate-speech"
               >
                 {isGenerating ? (
@@ -262,7 +262,7 @@ Não inclua títulos ou metadados no discurso, apenas o texto pronto a ser lido.
               </TouchableOpacity>
             </LinearGradient>
 
-            {showSpeech && generatedSpeech ? (
+            {(generatedSpeech ? true : false) && generatedSpeech ? (
               <View style={styles.resultContainer}>
                 <View style={styles.resultHeader}>
                   <Text style={styles.resultTitle}>Discurso Gerado</Text>

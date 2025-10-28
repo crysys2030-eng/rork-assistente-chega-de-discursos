@@ -84,7 +84,7 @@ export async function generateObject<TSchema extends z.ZodType<any>>(
   console.warn("rork-sdk-shim.generateObject: using local fallback");
   const prompt = extractPrompt(params.messages);
 
-  if (/discurso|speech/i.test(prompt)) {
+  if (/\b(discurso|speech)\b/i.test(prompt)) {
     const result: any = {
       speech: buildLocalSpeech(prompt),
       sources: buildLocalSources(),
@@ -92,7 +92,12 @@ export async function generateObject<TSchema extends z.ZodType<any>>(
     return result as z.infer<TSchema>;
   }
 
-  if (/tarefas|lista de tarefas|task list/i.test(prompt)) {
+  if (/(minuta|atas|reuni[aã]o|minutes)/i.test(prompt)) {
+    const result: any = buildLocalMinutes(prompt);
+    return result as z.infer<TSchema>;
+  }
+
+  if (/(tarefas|lista de tarefas|task list|to-?do|plano)/i.test(prompt)) {
     const result: any = buildLocalTaskList(prompt);
     return result as z.infer<TSchema>;
   }
@@ -122,7 +127,6 @@ function extractPrompt(
 }
 
 function buildLocalSpeech(topic: string): string {
-  const now = new Date();
   const header = "Portugueses e Portuguesas,";
   const body = `Hoje falamos de ${topic.replace(/\n+/g, " ").slice(0, 120)}. Defendemos Portugal, a nossa identidade e a autoridade do Estado. Combateremos a corrupção, protegeremos as famílias e daremos voz a quem trabalha e cumpre.`;
   const close = "Juntos, com coragem e verdade, faremos um Portugal mais justo. Muito obrigado.";
@@ -144,7 +148,7 @@ function buildLocalSources() {
   ];
 }
 
-function buildLocalTaskList(topic: string) {
+function buildLocalTaskList(_topic: string) {
   const title = "Plano Operacional — Tarefas Prioritárias";
   const description = "Conjunto de ações concretas e mensuráveis para execução imediata";
   const baseTask = (t: string, p: "high" | "medium" | "low" = "medium") => ({
@@ -165,4 +169,24 @@ function buildLocalTaskList(topic: string) {
     baseTask("Roadmap de riscos e mitigação", "medium"),
   ];
   return { title, description, tasks };
+}
+
+function buildLocalMinutes(_topic: string) {
+  const today = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const date = `${pad(today.getDate())}/${pad(today.getMonth() + 1)}/${today.getFullYear()}`;
+  const attendees = ["André Ventura", "Coordenação Distrital", "Equipa de Comunicação"];
+  const topics = [
+    "Estratégia de mobilização",
+    "Combate à corrupção",
+    "Agenda de eventos",
+  ];
+  const summary =
+    "Reunião focada em mobilização nacional, definição de prioridades e calendarização de ações. Foram alinhadas mensagens-chave e responsabilidades por equipa.";
+  const tasks = [
+    { task: "Definir calendário de comícios por distrito", priority: "high", assignedTo: "Coordenação Distrital", deadline: "14/11/2025" },
+    { task: "Plano de comunicação para redes sociais", priority: "medium", assignedTo: "Equipa de Comunicação", deadline: "21/11/2025" },
+    { task: "Reunião com apoiantes locais", priority: "low" },
+  ];
+  return { date, attendees, topics, summary, tasks };
 }
