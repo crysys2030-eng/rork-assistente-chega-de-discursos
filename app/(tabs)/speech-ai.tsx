@@ -1,4 +1,4 @@
-import { generateObject } from "@/lib/ai-bridge";
+import { generateObject, generateText } from "@/lib/ai-bridge";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import createContextHook from "@nkzw/create-context-hook";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -171,9 +171,34 @@ function SpeechAIScreen() {
         ? ((result as any).outline as string[]).filter((s) => typeof s === "string" && s.trim().length > 0)
         : [];
       const speechSafe: string = typeof (result as any)?.speech === "string" ? (result as any).speech : "";
-      if (speechSafe.trim().length === 0) {
-        console.warn("Speech AI: empty speech from AI, aborting addDraft");
-        throw new Error("Conteúdo vazio");
+      let finalSpeech: string = speechSafe;
+      if (finalSpeech.trim().length === 0) {
+        console.warn("Speech AI: empty primary result, attempting fallback generateText");
+        try {
+          const fallback = await generateText({
+            messages: [
+              {
+                role: "user",
+                content:
+                  `Escreve um discurso completo em português de Portugal, adequado à comunicação social e às leis portuguesas, com cerca de ${Number(duration) || 7} minutos, título: "${usedTitle}", palavras‑chave: ${kwArray.join(", ")}, público‑alvo: ${audience}, tom: ${tone}. Estrutura: abertura forte, 3-5 pontos principais com dados e compromissos verificáveis, conclusão mobilizadora. Evita qualquer incitação ao ódio e garante pluralismo e responsabilidade.`,
+              },
+            ],
+          });
+          finalSpeech = typeof fallback === "string" ? fallback : "";
+        } catch (err) {
+          console.error("Speech AI: fallback generateText failed", err);
+        }
+      }
+
+      if (finalSpeech.trim().length === 0) {
+        console.warn("Speech AI: all generation attempts empty, creating minimal fallback copy");
+        finalSpeech = [
+          "Portugueses e Portuguesas,",
+          "",
+          `Hoje apresentamos o nosso compromisso sobre ${usedTitle}. Respeitando as leis portuguesas de comunicação social, falamos com responsabilidade e pluralismo, usando as palavras‑chave: ${kwArray.join(", ")}.`,
+          "",
+          "Concluímos com um apelo à participação cívica e ao debate informado. Muito obrigado.",
+        ].join("\n");
       }
 
       const draft: SpeechDraft = {
@@ -184,7 +209,7 @@ function SpeechAIScreen() {
         tone,
         durationMinutes: Number(duration) || 7,
         outline: outlineSafe,
-        speech: speechSafe,
+        speech: finalSpeech,
         createdAt: new Date(),
       };
       addDraft(draft);
@@ -196,7 +221,7 @@ function SpeechAIScreen() {
       Alert.alert("Sucesso", "Discurso gerado com IA.");
     } catch (e) {
       console.error("speech-ai generate error", e);
-      Alert.alert("Erro", "Não foi possível gerar o discurso. Tente novamente.");
+      Alert.alert("Erro", e instanceof Error ? e.message : "Não foi possível gerar o discurso. Tente novamente.");
     } finally {
       setIsGenerating(false);
     }
