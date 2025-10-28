@@ -1,6 +1,6 @@
 import { generateObject } from "@/lib/rork-sdk-shim";
 import { Stack } from "expo-router";
-import { Sparkles, Loader2, Copy, Check, ExternalLink, Trash2 } from "lucide-react-native";
+import { Sparkles, Loader2, Copy, Check, ExternalLink, Trash2, Shield } from "lucide-react-native";
 import React, { useState } from "react";
 import {
   StyleSheet,
@@ -37,6 +37,7 @@ export default function SpeechScreen() {
   const [generatedSpeech, setGeneratedSpeech] = useState("");
   const [sources, setSources] = useState<Array<{ title: string; url: string; relevance: string }>>([]);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [showSpeech, setShowSpeech] = useState(false);
 
@@ -47,6 +48,7 @@ export default function SpeechScreen() {
     }
 
     setIsGenerating(true);
+    setAiError(null);
     try {
       const schema = z.object({
         speech: z.string().describe("O texto completo do discurso político"),
@@ -105,7 +107,13 @@ Não inclua títulos ou metadados no discurso, apenas o texto pronto a ser lido.
       setShowSpeech(true);
     } catch (error) {
       console.error("Error generating speech:", error);
-      Alert.alert("Erro", "Não foi possível gerar o discurso. Tente novamente.");
+      const message = (error as Error)?.message ?? "Erro desconhecido";
+      if (message.includes("AI generation is unavailable") || message.toLowerCase().includes("ai")) {
+        setAiError("A IA não está disponível neste deploy. Ative o Backend no topo para usar as funcionalidades de IA.");
+      }
+      Alert.alert("Erro", (error as Error)?.message?.includes("AI generation is unavailable")
+        ? "A IA não está disponível neste deploy. Clique em Backend no topo para ativar."
+        : "Não foi possível gerar o discurso. Tente novamente.");
     } finally {
       setIsGenerating(false);
     }
@@ -146,6 +154,12 @@ Não inclua títulos ou metadados no discurso, apenas o texto pronto a ser lido.
         <SafeAreaView edges={["top"]} style={styles.safeArea}>
         <Text style={styles.headerTitle}>🎯 Preparação de Discursos</Text>
         <Text style={styles.headerSubtitle}>IA alinhada com o Chega</Text>
+        {aiError ? (
+          <View style={styles.aiBanner} testID="ai-unavailable-banner">
+            <Shield size={16} color="#FF453A" />
+            <Text style={styles.aiBannerText}>A IA não está disponível neste deploy. Ative Backend no topo para usar IA.</Text>
+          </View>
+        ) : null}
         </SafeAreaView>
       </LinearGradient>
 
@@ -229,9 +243,10 @@ Não inclua títulos ou metadados no discurso, apenas o texto pronto a ser lido.
               style={styles.generateButton}
             >
               <TouchableOpacity
-                style={styles.generateButtonInner}
+                style={[styles.generateButtonInner, aiError ? styles.generateButtonInnerDisabled : null]}
                 onPress={handleGenerate}
-                disabled={isGenerating}
+                disabled={isGenerating || !!aiError}
+                testID="generate-speech"
               >
                 {isGenerating ? (
                   <>
@@ -241,7 +256,7 @@ Não inclua títulos ou metadados no discurso, apenas o texto pronto a ser lido.
                 ) : (
                   <>
                     <Sparkles size={20} color="#FFFFFF" />
-                    <Text style={styles.generateButtonText}>Gerar Discurso</Text>
+                    <Text style={styles.generateButtonText}>{aiError ? "IA indisponível" : "Gerar Discurso"}</Text>
                   </>
                 )}
               </TouchableOpacity>
@@ -334,6 +349,22 @@ const styles = StyleSheet.create({
   safeArea: {
     paddingHorizontal: 20,
   },
+  aiBanner: {
+    marginTop: 10,
+    backgroundColor: "#3b0b0e",
+    borderColor: "#FF453A",
+    borderWidth: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  aiBannerText: {
+    color: "#FFB3AE",
+    fontSize: 12,
+  },
   headerTitle: {
     fontSize: 26,
     fontWeight: "700" as const,
@@ -416,6 +447,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     gap: 8,
+  },
+  generateButtonInnerDisabled: {
+    opacity: 0.6,
   },
   generateButtonText: {
     color: "#FFFFFF",
