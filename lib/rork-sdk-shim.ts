@@ -85,29 +85,18 @@ export async function generateObject<TSchema extends z.ZodType<any>>(
   const prompt = extractPrompt(params.messages);
 
   if (/\b(t[íi]tulo|palavras?[- ]?chave|temas?)\b/i.test(prompt)) {
-    const baseTitle = "Mensagem à Comunicação Social";
-    const kw = ["pluralismo", "responsabilidade", "Portugal", "transparência", "segurança", "economia"].slice(0, 5);
-    const result: any = { title: baseTitle, keywords: kw };
+    const baseTitle = uniqueTitle("Mensagem à Comunicação Social");
+    const kw = ["pluralismo", "responsabilidade", "Portugal", "transparência", "segurança", "economia"].slice(0, 6);
+    const content = buildLocalSpeech(prompt);
+    const result: any = { title: baseTitle, keywords: kw, content };
     return result as z.infer<TSchema>;
   }
 
   if (/\b(discurso|speech)\b/i.test(prompt)) {
-    const outline = [
-      "Abertura e enquadramento legal",
-      "Diagnóstico com dados verificados",
-      "Compromissos específicos e mensuráveis",
-      "Garantias de transparência e responsabilidade",
-      "Apelo final à participação cívica",
-    ];
-    const result: any = {
-      outline,
-      speech: buildLocalSpeech(prompt),
-      compliance_notes: [
-        "Respeito pelo pluralismo e direitos fundamentais",
-        "Ausência de incitação ao ódio ou discriminação",
-        "Compromissos verificáveis e baseados em fontes públicas",
-      ],
-    };
+    const title = uniqueTitle("Discurso ao País");
+    const content = buildLocalSpeech(prompt);
+    const keywords = ["Portugal", "valores", "economia", "famílias", "segurança", "confiança"];
+    const result: any = { title, content, keywords };
     return result as z.infer<TSchema>;
   }
 
@@ -146,10 +135,20 @@ function extractPrompt(
 }
 
 function buildLocalSpeech(topic: string): string {
+  const theme = topic.replace(/\s+/g, " ").slice(0, 160);
   const header = "Portugueses e Portuguesas,";
-  const body = `Hoje falamos de ${topic.replace(/\n+/g, " ").slice(0, 120)}. Defendemos Portugal, a nossa identidade e a autoridade do Estado. Combateremos a corrupção, protegeremos as famílias e daremos voz a quem trabalha e cumpre.`;
-  const close = "Juntos, com coragem e verdade, faremos um Portugal mais justo. Muito obrigado.";
-  return [header, "", body, "", close].join("\n");
+  const para1 = `Hoje, com clareza e respeito, falamos de ${theme}. O nosso compromisso é com a verdade, com a segurança das pessoas, com a economia que cria oportunidades e com o mérito de quem trabalha.`;
+  const para2 = `Queremos um Estado que funcione: serviços públicos próximos, justiça célere, apoio real às famílias e liberdade para empreender. Combateremos privilégios, ineficiências e a corrupção que mina a confiança.`;
+  const para3 = `Propomos metas concretas: reduzir prazos de resposta do Estado, aliviar a carga fiscal sobre o trabalho, apoiar PME e qualificar a administração. Transparência total, contas certas e avaliação de resultados.`;
+  const close = "Juntos, com coragem e responsabilidade, construiremos um Portugal mais justo. Muito obrigado.";
+  return [header, "", para1, "", para2, "", para3, "", close].join("\n");
+}
+
+function uniqueTitle(base: string): string {
+  const ts = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const stamp = `${ts.getFullYear()}${pad(ts.getMonth() + 1)}${pad(ts.getDate())}-${pad(ts.getHours())}${pad(ts.getMinutes())}`;
+  return `${base} ${stamp}`;
 }
 
 function buildLocalSources() {
