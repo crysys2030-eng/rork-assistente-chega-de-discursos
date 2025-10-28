@@ -1,8 +1,8 @@
 import createContextHook from "@nkzw/create-context-hook";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Stack } from "expo-router";
-import { Plus, Calendar, Mic, Users, Trash2 } from "lucide-react-native";
+import { Stack, useRouter } from "expo-router";
+import { Plus, Calendar, Mic, Users, Trash2, Sparkles } from "lucide-react-native";
 import React, { useState, useEffect } from "react";
 import {
   StyleSheet,
@@ -68,6 +68,7 @@ const [AgendaContext, useAgenda] = createContextHook(() => {
 });
 
 function AgendaScreen() {
+  const router = useRouter();
   const { items, addItem, removeItem } = useAgenda();
   const [modalVisible, setModalVisible] = useState(false);
   const [newItem, setNewItem] = useState<Partial<AgendaItem>>({
@@ -160,6 +161,26 @@ function AgendaScreen() {
       </LinearGradient>
 
       <ScrollView style={styles.scrollView}>
+        <View style={styles.quickActions}>
+          <LinearGradient colors={["#E94E1B", "#FF7A45"]} style={styles.quickCard}>
+            <TouchableOpacity
+              onPress={() => {
+                console.log("navigate -> /(tabs)/speech");
+                router.push("/speech");
+              }}
+              style={styles.quickCardInner}
+              testID="go-generate-speech"
+            >
+              <View style={styles.quickIconWrap}>
+                <Sparkles size={22} color="#FFFFFF" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.quickTitle}>Gerar Discurso (IA)</Text>
+                <Text style={styles.quickSubtitle}>Crie um discurso com palavras‑chave e conformidade PT</Text>
+              </View>
+            </TouchableOpacity>
+          </LinearGradient>
+        </View>
         {sortedItems.length === 0 ? (
           <View style={styles.emptyState}>
             <Calendar size={64} color="#C7C7CC" />
@@ -403,6 +424,41 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
     backgroundColor: "#0f0f23",
+  },
+  quickActions: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+  },
+  quickCard: {
+    borderRadius: 16,
+    shadowColor: "#E94E1B",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    elevation: 6,
+  },
+  quickCardInner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 16,
+  },
+  quickIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  quickTitle: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "700" as const,
+  },
+  quickSubtitle: {
+    color: "#FFE6DE",
+    fontSize: 12,
   },
   emptyState: {
     flex: 1,
