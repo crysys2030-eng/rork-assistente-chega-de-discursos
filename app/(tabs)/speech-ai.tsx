@@ -4,7 +4,7 @@ import createContextHook from "@nkzw/create-context-hook";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
-import { Check, Copy, Loader2, Megaphone, Plus, Sparkles, Trash2 } from "lucide-react-native";
+import { Check, Copy, Loader2, Megaphone, Plus, Sparkles, Trash2, Wand2 } from "lucide-react-native";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert,
@@ -99,6 +99,7 @@ function SpeechAIScreen() {
   const [tone, setTone] = useState<SpeechDraft["tone"]>("institucional");
   const [duration, setDuration] = useState<string>("7");
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
+  const [isGeneratingThemes, setIsGeneratingThemes] = useState<boolean>(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const confirmAsync = useCallback((titleText: string, message: string) => {
@@ -115,15 +116,38 @@ function SpeechAIScreen() {
     });
   }, []);
 
-  const handleGenerate = async () => {
-    if (!title.trim()) {
-      Alert.alert("Erro", "Indique um título para o discurso.");
-      return;
+  const generateThemes = useCallback(async () => {
+    setIsGeneratingThemes(true);
+    try {
+      const last = [...drafts]
+        .sort((a, b) => (b.createdAt instanceof Date ? b.createdAt : new Date(b.createdAt)).getTime() - (a.createdAt instanceof Date ? a.createdAt : new Date(a.createdAt)).getTime())[0];
+      const lastTitle = last?.title ?? "";
+      const lastKeywords = Array.isArray(last?.keywords) ? last.keywords.join(", ") : "";
+      const schema = z.object({ title: z.string().min(6).max(100), keywords: z.array(z.string()).min(3).max(8) });
+      const prompt = `Gera um TÍTULO e PALAVRAS‑CHAVE para um novo discurso político (PT‑PT) totalmente diferentes do anterior. Público‑alvo: ${audience}. Tom: ${tone}. Evita repetir ou parafrasear o anterior. Anterior: título="${lastTitle}", keywords=[${lastKeywords}]. Responde apenas com JSON.`;
+      const res = await generateObject({ messages: [{ role: "user", content: prompt }], schema });
+      const kws = (res.keywords ?? []).map((k: string) => k.trim()).filter(Boolean);
+      setTitle(res.title ?? "");
+      setKeywords(kws.join(", "));
+      return { title: res.title as string, keywords: kws as string[] };
+    } catch (e) {
+      console.error("generateThemes error", e);
+      Alert.alert("Erro", "Não foi possível gerar novos temas. Tente novamente.");
+      return null;
+    } finally {
+      setIsGeneratingThemes(false);
     }
-    const kw = keywords.split(",").map((k) => k.trim()).filter(Boolean);
-    if (kw.length === 0) {
-      Alert.alert("Erro", "Introduza pelo menos uma palavra‑chave.");
-      return;
+  }, [audience, tone, drafts]);
+
+  const handleGenerate = async () => {
+    let usedTitle = title.trim();
+    let kwArray = keywords.split(",").map((k) => k.trim()).filter(Boolean);
+
+    if (!usedTitle || kwArray.length === 0) {
+      const themes = await generateThemes();
+      if (!themes) return;
+      usedTitle = themes.title;
+      kwArray = themes.keywords;
     }
 
     setIsGenerating(true);
@@ -136,7 +160,7 @@ function SpeechAIScreen() {
           .describe("Notas de conformidade com leis portuguesas de comunicação social: imparcialidade, responsabilidade, ausência de incitação ao ódio, transparência"),
       });
 
-      const sysPrompt = `Gera um discurso político em português de Portugal, adequado para comunicação social, obedecendo às normas legais portuguesas (pluralismo, responsabilidade, respeito pelos direitos fundamentais e rejeição de incitação ao ódio). Ajusta o comprimento para cerca de ${Number(duration) || 7} minutos. Público-alvo: ${audience}. Tom: ${tone}. Palavras‑chave obrigatórias (usar de forma natural): ${kw.join(", ")}. Título: ${title}. Estrutura: abertura forte, 3-5 pontos principais com dados e compromissos verificáveis, call to action final. Evita afirmações factualmente não comprovadas.`;
+      const sysPrompt = `Gera um discurso político em português de Portugal, adequado para comunicação social, obedecendo às normas legais portuguesas (pluralismo, responsabilidade, respeito pelos direitos fundamentais e rejeição de incitação ao ódio). Ajusta o comprimento para cerca de ${Number(duration) || 7} minutos. Público-alvo: ${audience}. Tom: ${tone}. Palavras‑chave obrigatórias (usar de forma natural): ${kwArray.join(", ")}. Título: ${usedTitle}. Estrutura: abertura forte, 3-5 pontos principais com dados e compromissos verificáveis, call to action final. Evita afirmações factualmente não comprovadas. Não repitas conteúdos ou temas do último discurso salvo se estritamente necessário.`;
 
       const result = await generateObject({
         messages: [{ role: "user", content: sysPrompt }],
@@ -145,8 +169,8 @@ function SpeechAIScreen() {
 
       const draft: SpeechDraft = {
         id: Date.now().toString(),
-        title,
-        keywords: kw,
+        title: usedTitle,
+        keywords: kwArray,
         audience,
         tone,
         durationMinutes: Number(duration) || 7,
@@ -216,11 +240,18 @@ function SpeechAIScreen() {
               <Text style={styles.headerTitle}>📣 Discurso IA</Text>
               <Text style={styles.headerSubtitle}>Geração profissional (PT‑PT)</Text>
             </View>
-            <LinearGradient colors={["#00D4FF", "#0099CC"]} style={styles.addButton}>
-              <TouchableOpacity onPress={handleGenerate} style={styles.addButtonTouchable} disabled={isGenerating} testID="generateButton">
-                {isGenerating ? <Loader2 size={24} color="#FFFFFF" /> : <Sparkles size={24} color="#FFFFFF" />}
-              </TouchableOpacity>
-            </LinearGradient>
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              <LinearGradient colors={["#6ee7b7", "#10b981"]} style={styles.addButton}>
+                <TouchableOpacity onPress={generateThemes} style={styles.addButtonTouchable} disabled={isGeneratingThemes} testID="generateThemesButton">
+                  {isGeneratingThemes ? <Loader2 size={24} color="#FFFFFF" /> : <Wand2 size={24} color="#FFFFFF" />}
+                </TouchableOpacity>
+              </LinearGradient>
+              <LinearGradient colors={["#00D4FF", "#0099CC"]} style={styles.addButton}>
+                <TouchableOpacity onPress={handleGenerate} style={styles.addButtonTouchable} disabled={isGenerating} testID="generateButton">
+                  {isGenerating ? <Loader2 size={24} color="#FFFFFF" /> : <Sparkles size={24} color="#FFFFFF" />}
+                </TouchableOpacity>
+              </LinearGradient>
+            </View>
           </View>
         </LinearGradient>
       </View>
@@ -240,12 +271,12 @@ function SpeechAIScreen() {
               />
             </View>
             <View style={styles.inputRow}>
-              <Text style={styles.label}>Palavras‑chave</Text>
+              <Text style={styles.label}>Palavras‑chave (IA)</Text>
               <TextInput
                 style={styles.input}
                 value={keywords}
                 onChangeText={setKeywords}
-                placeholder="separadas por vírgulas (economia, saúde, justiça)"
+                placeholder="Use o botão Temas para gerar automaticamente"
                 placeholderTextColor="#8E8E93"
                 testID="keywordsInput"
               />
