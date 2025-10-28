@@ -1,6 +1,6 @@
 import { generateObject, isLocalAI } from "@/lib/ai-bridge";
 import { Stack } from "expo-router";
-import { Sparkles, Loader2, Copy, Check, ExternalLink, Trash2, Shield } from "lucide-react-native";
+import { Sparkles, Loader2, Copy, Check, ExternalLink, Trash2, Shield, Scale } from "lucide-react-native";
 import React, { useState } from "react";
 import {
   StyleSheet,
@@ -25,6 +25,7 @@ interface SpeechFormData {
   duration: string;
   audience: string;
   keywords: string;
+  complyPTMediaLaw: boolean;
 }
 
 export default function SpeechScreen() {
@@ -34,6 +35,7 @@ export default function SpeechScreen() {
     duration: "5",
     audience: "",
     keywords: "",
+    complyPTMediaLaw: true,
   });
 
   const [generatedSpeech, setGeneratedSpeech] = useState("");
@@ -128,49 +130,40 @@ export default function SpeechScreen() {
           z.object({
             title: z.string().describe("Título ou descrição da fonte"),
             url: z.string().describe("URL real e verificável da fonte"),
-            relevance: z.string().describe("Como esta fonte comprova os pontos do discurso")
+            relevance: z.string().describe("Como esta fonte comprova os pontos do discurso"),
           })
         ).describe("Lista de fontes reais e verificáveis que comprovam os factos mencionados"),
-        extractedKeywords: z.array(z.string()).describe("Palavras‑chave realmente usadas no discurso")
+        extractedKeywords: z.array(z.string()).describe("Palavras‑chave realmente usadas no discurso"),
       });
 
-      const prompt = `Crie um discurso político em português alinhado com as ideias e valores do partido Chega com as seguintes características:
-      
+      const compliance = formData.complyPTMediaLaw
+        ? `
+Requisitos legais e deontológicos obrigatórios (Portugal):
+- Cumprir Lei da Imprensa, Estatuto do Jornalista, Código Deontológico, Lei da Televisão e dos Serviços Audiovisuais a Pedido, RGPD e orientações da ERC.
+- Distinguir claramente factos de opinião. Não apresentar alegações como factos sem fonte.
+- Presunção de inocência. Evitar calúnia, difamação e acusações específicas a pessoas/entidades sem provas e fontes.
+- Linguagem não discriminatória em razão de raça, religião, género, orientação sexual, origem ou condição social (Lei n.º 93/2017).
+- Assegurar direito de resposta: quando houver crítica direta, mencionar abertura a resposta e contraditório.
+- Citar fontes com URLs verificáveis (.pt, órgãos de comunicação social credíveis ou entidades oficiais) para cada facto relevante.
+- Evitar dados pessoais sensíveis.`
+        : "";
+
+      const prompt = `Crie um discurso em português para comunicação social, gerado por IA, com as características abaixo e estrita conformidade quando indicado.
 Tema: ${formData.topic}
 Tom: ${formData.tone}
 Duração estimada: ${formData.duration} minutos
 Audiência: ${formData.audience || "Cidadãos portugueses"}
 Palavras‑chave para incluir naturalmente: ${formData.keywords.trim() ? formData.keywords : "escolhe 5–8 palavras‑chave relevantes"}
-
-O discurso deve refletir as posições do Chega:
-- Defesa da soberania nacional e identidade portuguesa
-- Combate à corrupção e privilégios
-- Reforço da segurança e autoridade do Estado
-- Defesa da família tradicional e valores conservadores
-- Crítica ao sistema político estabelecido
-- Patriotismo e orgulho nacional
-- Justiça social com responsabilidade individual
-
-O discurso deve:
-- Ter uma introdução forte e impactante
-- Desenvolver os pontos principais com convicção
-- Incluir referências aos valores portugueses e à história de Portugal
-- Apelar ao sentimento patriótico
-- Ter uma conclusão mobilizadora
-- Ser direto, claro e sem rodeios políticos
-- Refletir o tom ${formData.tone === "radical" ? "mais incisivo e combativo" : formData.tone}
-- Focar sempre em Portugal, Europa e o Mundo
-- Quando mencionar situações em que Portugal foi prejudicado, usar factos verificáveis
-- Usar e entrelaçar de forma natural as palavras‑chave listadas (ou sugeridas pelo modelo)
-
-IMPORTANTE: Fornece SEMPRE fontes reais e verificáveis para os factos mencionados:
-- URLs reais de fontes credíveis (jornais portugueses, sites governamentais, organizações internacionais)
-- Cada facto importante deve ter uma fonte associada
-- Quando mencionar que Portugal foi prejudicado, fornecer provas concretas com fontes
-- Priorizar fontes portuguesas quando disponíveis (ex: Público, Expresso, Observador, sites .gov.pt)
-- Incluir também fontes europeias e internacionais quando relevante
-
-Não inclua títulos ou metadados no discurso, apenas o texto pronto a ser lido.`;
+${compliance}
+Estrutura e estilo:
+- Introdução forte e clara
+- Desenvolvimento com 3–6 pontos principais
+- Integração natural das palavras‑chave
+- Conclusão mobilizadora
+- Texto contínuo pronto a ser lido, sem títulos
+- Manter rigor factual e citar fontes para factos relevantes
+- Evitar conteúdo sensacionalista
+Devolver JSON com: speech, sources[{title,url,relevance}], extractedKeywords.`;
 
       if (isLocalAI) {
         const local = buildLocalSpeech(formData);
@@ -339,6 +332,21 @@ Não inclua títulos ou metadados no discurso, apenas o texto pronto a ser lido.
                 multiline
                 testID="keywords-input"
               />
+            </View>
+
+            <View style={styles.complianceCard}>
+              <View style={styles.complianceHeader}>
+                <Scale size={18} color="#34C759" />
+                <Text style={styles.complianceTitle}>Modo Comunicação Social (Portugal)</Text>
+              </View>
+              <Text style={styles.complianceText}>Gera discurso conforme Lei da Imprensa, Estatuto do Jornalista, Código Deontológico, RGPD e orientações da ERC.</Text>
+              <TouchableOpacity
+                onPress={() => setFormData({ ...formData, complyPTMediaLaw: !formData.complyPTMediaLaw })}
+                style={[styles.toggleButton, formData.complyPTMediaLaw ? styles.toggleButtonOn : styles.toggleButtonOff]}
+                testID="toggle-pt-compliance"
+              >
+                <Text style={styles.toggleLabel}>{formData.complyPTMediaLaw ? "Ativo" : "Inativo"}</Text>
+              </TouchableOpacity>
             </View>
 
             <LinearGradient
@@ -640,6 +648,48 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#8E8E93",
     marginBottom: 8,
+  },
+  complianceCard: {
+    backgroundColor: "#0f172a",
+    borderColor: "#1e293b",
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    gap: 8,
+  },
+  complianceHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  complianceTitle: {
+    color: "#FFFFFF",
+    fontSize: 15,
+    fontWeight: "700" as const,
+  },
+  complianceText: {
+    color: "#94a3b8",
+    fontSize: 13,
+  },
+  toggleButton: {
+    alignSelf: "flex-start",
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  toggleButtonOn: {
+    backgroundColor: "#064e3b",
+    borderColor: "#10b981",
+  },
+  toggleButtonOff: {
+    backgroundColor: "#3f3f46",
+    borderColor: "#71717a",
+  },
+  toggleLabel: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "600" as const,
   },
   sourceCard: {
     borderRadius: 12,
