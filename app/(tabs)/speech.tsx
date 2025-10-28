@@ -24,6 +24,7 @@ interface SpeechFormData {
   tone: "formal" | "informal" | "inspiracional" | "radical";
   duration: string;
   audience: string;
+  keywords: string;
 }
 
 export default function SpeechScreen() {
@@ -32,10 +33,12 @@ export default function SpeechScreen() {
     tone: "radical",
     duration: "5",
     audience: "",
+    keywords: "",
   });
 
   const [generatedSpeech, setGeneratedSpeech] = useState("");
   const [sources, setSources] = useState<Array<{ title: string; url: string; relevance: string }>>([]);
+  const [extractedKeywords, setExtractedKeywords] = useState<string[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -58,7 +61,8 @@ export default function SpeechScreen() {
             url: z.string().describe("URL real e verificável da fonte"),
             relevance: z.string().describe("Como esta fonte comprova os pontos do discurso")
           })
-        ).describe("Lista de fontes reais e verificáveis que comprovam os factos mencionados")
+        ).describe("Lista de fontes reais e verificáveis que comprovam os factos mencionados"),
+        extractedKeywords: z.array(z.string()).describe("Palavras‑chave realmente usadas no discurso")
       });
 
       const prompt = `Crie um discurso político em português alinhado com as ideias e valores do partido Chega com as seguintes características:
@@ -67,6 +71,7 @@ Tema: ${formData.topic}
 Tom: ${formData.tone}
 Duração estimada: ${formData.duration} minutos
 Audiência: ${formData.audience || "Cidadãos portugueses"}
+Palavras‑chave para incluir naturalmente: ${formData.keywords.trim() ? formData.keywords : "escolhe 5–8 palavras‑chave relevantes"}
 
 O discurso deve refletir as posições do Chega:
 - Defesa da soberania nacional e identidade portuguesa
@@ -87,6 +92,7 @@ O discurso deve:
 - Refletir o tom ${formData.tone === "radical" ? "mais incisivo e combativo" : formData.tone}
 - Focar sempre em Portugal, Europa e o Mundo
 - Quando mencionar situações em que Portugal foi prejudicado, usar factos verificáveis
+- Usar e entrelaçar de forma natural as palavras‑chave listadas (ou sugeridas pelo modelo)
 
 IMPORTANTE: Fornece SEMPRE fontes reais e verificáveis para os factos mencionados:
 - URLs reais de fontes credíveis (jornais portugueses, sites governamentais, organizações internacionais)
@@ -104,6 +110,7 @@ Não inclua títulos ou metadados no discurso, apenas o texto pronto a ser lido.
       
       setGeneratedSpeech(result.speech);
       setSources(result.sources);
+      setExtractedKeywords(result.extractedKeywords ?? []);
       setShowSpeech(true);
     } catch (error) {
       console.error("Error generating speech:", error);
@@ -144,6 +151,7 @@ Não inclua títulos ou metadados no discurso, apenas o texto pronto a ser lido.
     if (ok) {
       setGeneratedSpeech("");
       setSources([]);
+      setExtractedKeywords([]);
       setShowSpeech(false);
     }
   };
@@ -242,6 +250,19 @@ Não inclua títulos ou metadados no discurso, apenas o texto pronto a ser lido.
               />
             </View>
 
+            <View style={styles.formSection}>
+              <Text style={styles.label}>Palavras‑chave (separadas por vírgulas)</Text>
+              <TextInput
+                style={styles.textInput}
+                value={formData.keywords}
+                onChangeText={(text) => setFormData({ ...formData, keywords: text })}
+                placeholder="Ex: soberania, corrupção, segurança, família, justiça"
+                placeholderTextColor="#8E8E93"
+                multiline
+                testID="keywords-input"
+              />
+            </View>
+
             <LinearGradient
               colors={isGenerating ? ["#C7C7CC", "#8E8E93"] : ["#00D4FF", "#0099CC"]}
               style={styles.generateButton}
@@ -289,6 +310,17 @@ Não inclua títulos ou metadados no discurso, apenas o texto pronto a ser lido.
                     </TouchableOpacity>
                   </View>
                 </View>
+
+                {extractedKeywords.length > 0 && (
+                  <View style={styles.keywordsContainer} testID="extracted-keywords">
+                    {extractedKeywords.map((kw, i) => (
+                      <View key={`${kw}-${i}`} style={styles.keywordChip}>
+                        <Text style={styles.keywordText}>#{kw}</Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+
                 <ScrollView style={styles.speechContainer}>
                   <Text style={styles.speechText}>{generatedSpeech}</Text>
                 </ScrollView>
@@ -500,6 +532,25 @@ const styles = StyleSheet.create({
   sourcesContainer: {
     marginTop: 20,
     gap: 12,
+  },
+  keywordsContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 8,
+  },
+  keywordChip: {
+    backgroundColor: "#16213e",
+    borderColor: "#0f3460",
+    borderWidth: 1,
+    borderRadius: 16,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+  },
+  keywordText: {
+    color: "#00D4FF",
+    fontSize: 13,
+    fontWeight: "600" as const,
   },
   sourcesTitle: {
     fontSize: 20,
