@@ -167,6 +167,15 @@ function SpeechAIScreen() {
         schema,
       });
 
+      const outlineSafe: string[] = Array.isArray((result as any)?.outline)
+        ? ((result as any).outline as string[]).filter((s) => typeof s === "string" && s.trim().length > 0)
+        : [];
+      const speechSafe: string = typeof (result as any)?.speech === "string" ? (result as any).speech : "";
+      if (speechSafe.trim().length === 0) {
+        console.warn("Speech AI: empty speech from AI, aborting addDraft");
+        throw new Error("Conteúdo vazio");
+      }
+
       const draft: SpeechDraft = {
         id: Date.now().toString(),
         title: usedTitle,
@@ -174,8 +183,8 @@ function SpeechAIScreen() {
         audience,
         tone,
         durationMinutes: Number(duration) || 7,
-        outline: result.outline,
-        speech: result.speech,
+        outline: outlineSafe,
+        speech: speechSafe,
         createdAt: new Date(),
       };
       addDraft(draft);

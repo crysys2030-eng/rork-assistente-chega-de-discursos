@@ -8,9 +8,18 @@ try {
   console.log("AI Bridge: real SDK not available, using shim");
 }
 
-export const isLocalAI: boolean = !real;
+const backendURL: string | undefined = (process.env as any)?.EXPO_PUBLIC_TOOLKIT_URL;
+const shouldUseShim = !backendURL || !real;
+if (shouldUseShim) {
+  console.log(
+    "AI Bridge: Using local shim — reason:",
+    !backendURL ? "No EXPO_PUBLIC_TOOLKIT_URL set" : "Toolkit SDK not resolved"
+  );
+}
 
-export const useRorkAgent: typeof shim.useRorkAgent = real?.useRorkAgent ?? shim.useRorkAgent;
-export const createRorkTool: typeof shim.createRorkTool = real?.createRorkTool ?? shim.createRorkTool;
-export const generateObject: typeof shim.generateObject = real?.generateObject ?? shim.generateObject;
-export const generateText: typeof shim.generateText = real?.generateText ?? shim.generateText;
+export const isLocalAI: boolean = shouldUseShim;
+
+export const useRorkAgent: typeof shim.useRorkAgent = shouldUseShim ? shim.useRorkAgent : real.useRorkAgent;
+export const createRorkTool: typeof shim.createRorkTool = shouldUseShim ? shim.createRorkTool : real.createRorkTool;
+export const generateObject: typeof shim.generateObject = shouldUseShim ? shim.generateObject : real.generateObject;
+export const generateText: typeof shim.generateText = shouldUseShim ? shim.generateText : real.generateText;
