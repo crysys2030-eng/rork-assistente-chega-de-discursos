@@ -4,7 +4,7 @@ import createContextHook from "@nkzw/create-context-hook";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
-import { Megaphone, Loader2, Sparkles, Copy, Check, Trash2, RotateCw } from "lucide-react-native";
+import { Megaphone, Loader2, Sparkles, Copy, Check, Trash2, RotateCw, Globe2 } from "lucide-react-native";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert,
@@ -17,6 +17,7 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  Switch,
 } from "react-native";
 import * as Clipboard from "expo-clipboard";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -83,6 +84,16 @@ const [SpeechContext, useSpeeches] = createContextHook(() => {
   return useMemo(() => ({ speeches, addSpeech, removeSpeech, isLoading: q.isLoading }), [speeches, addSpeech, removeSpeech, q.isLoading]);
 });
 
+async function fetchWikiBrief(term: string): Promise<{ title: string; snippet: string }[]> {
+  if (!term.trim()) return [];
+  const url = `https://pt.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(term)}&format=json&origin=*`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error("Falha ao obter dados");
+  const json = await res.json();
+  const list = (json?.query?.search ?? []) as any[];
+  return list.slice(0, 5).map((i) => ({ title: String(i?.title ?? ""), snippet: String(i?.snippet ?? "").replace(/<[^>]+>/g, " ") }));
+}
+
 function SpeechAIScreen() {
   const insets = useSafeAreaInsets();
   const { speeches, addSpeech, removeSpeech } = useSpeeches();
@@ -96,6 +107,9 @@ function SpeechAIScreen() {
   const [length, setLength] = useState<string>("");
   const [audience, setAudience] = useState<string>("");
   const [language, setLanguage] = useState<string>("pt-PT");
+  const [useRealData, setUseRealData] = useState<boolean>(true);
+  const [isFetchingReal, setIsFetchingReal] = useState<boolean>(false);
+  const [realBrief, setRealBrief] = useState<string>("");
 
   const existingTitles = useMemo(() => speeches.map((s) => s.title).filter(Boolean), [speeches]);
 
@@ -120,6 +134,7 @@ function SpeechAIScreen() {
   };
 
   const handleGenerate = async () => {
+    setRealBrief("");
     const rawKeywords = keywordsInput
       .split(',')
       .map((k) => k.trim())
@@ -144,6 +159,18 @@ function SpeechAIScreen() {
         `Idioma: ${language}`,
       ].join("\n");
 
+      let realContext = "";
+      try {
+        const topicForSearch = (customTitle || rawKeywords.join(" ")).slice(0, 120);
+        const wiki = await fetchWikiBrief(topicForSearch);
+        if (useRealData && wiki.length > 0) {
+          realContext = wiki.map((w, i) => `${i + 1}. ${w.title} — ${w.snippet}`).join("\n");
+          setRealBrief(realContext);
+        }
+      } catch (e) {
+        console.log("speech-ai: real data fetch error", e);
+      }
+
       const basePrompt = `Gera um discurso político 100% criado por IA.
 ${preferences}
 - Usa estas palavras‑chave obrigatórias: ${rawKeywords.join(', ')}
@@ -151,7 +178,8 @@ ${preferences}
 - O título NÃO pode repetir nenhum existente: ${existingTitles.join(', ') || 'nenhum'}
 - Devolve APENAS o título e o discurso em texto corrido, sem listas nem markdown.
 - Estrutura: abertura impactante, 3–5 secções com narrativa coerente, conclusão mobilizadora.
-- Evita conteúdos vazios e repetições. Sê específico e varia a linguagem.`;
+- Evita conteúdos vazios e repetições. Sê específico e varia a linguagem.
+${useRealData && realContext ? `\nContexto factual (Wikipédia PT):\n${realContext}\nUsa este contexto para fundamentar o discurso, mantendo tom político.` : ''}`;
 
       let attempt = 0;
       let result: { title: string; content: string } | null = null;
@@ -270,6 +298,25 @@ ${preferences}
             testID="speech-ai-keywords-input"
           />
           <Text style={styles.hint}>Separe com vírgulas. A IA cria o resto.</Text>
+
+          <View style={styles.switchRow}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <Globe2 size={16} color="#00D4FF" />
+              <Text style={styles.switchLabel}>Usar dados reais (Wikipédia PT)</Text>
+            </View>
+            <Switch
+              value={useRealData}
+              onValueChange={setUseRealData}
+              thumbColor={Platform.OS === 'ios' ? undefined : (useRealData ? "#00D4FF" : "#E5E5EA")}
+              trackColor={{ false: "#C7C7CC", true: "#8EE6FF" }}
+              testID="speech-ai-use-real-data"
+            />
+          </View>
+          {isFetchingReal ? (
+            <Text style={styles.realInfo}>A obter contexto…</Text>
+          ) : realBrief ? (
+            <Text style={styles.realInfo}>Contexto adicionado ao prompt.</Text>
+          ) : null}
 
           <Text style={[styles.label, { marginTop: 12 }]}>Título (opcional)</Text>
           <TextInput
@@ -446,6 +493,9 @@ const styles = StyleSheet.create({
   keywordsText: { fontSize: 12, color: "#E94E1B" },
   contentText: { fontSize: 14, color: "#FFFFFF", lineHeight: 22 },
   actionsRow: { flexDirection: "row", gap: 8, marginTop: 12 },
+  switchRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 10 },
+  switchLabel: { color: "#FFFFFF", fontSize: 13, fontWeight: "600" as const },
+  realInfo: { color: "#8E8E93", fontSize: 12, marginTop: 6 },
   actionButton: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "rgba(0, 212, 255, 0.2)", paddingVertical: 10, paddingHorizontal: 12, borderRadius: 12 },
   actionText: { fontSize: 14, fontWeight: "600" as const, color: "#00D4FF" },
   deleteBtn: { padding: 4 },
