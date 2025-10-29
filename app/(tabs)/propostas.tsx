@@ -337,7 +337,7 @@ Linguagem formal em Português de Portugal adequada ao contexto parlamentar.`;
           </View>
         ) : (
           <View style={styles.proposalsList}>
-            {[...proposals]
+            {proposals && [...proposals]
               .sort((a, b) => {
                 try {
                   const dateA =
