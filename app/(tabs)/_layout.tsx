@@ -1,5 +1,5 @@
 import { Tabs } from "expo-router";
-import { Calendar, FileText, ListChecks, Megaphone } from "lucide-react-native";
+import { Calendar, FileText, ListChecks, Megaphone, Globe2 } from "lucide-react-native";
 import React from "react";
 
 export default function TabLayout() {
@@ -43,6 +43,13 @@ export default function TabLayout() {
         options={{
           title: "Discurso IA",
           tabBarIcon: ({ color }) => <Megaphone color={color} size={24} />,
+        }}
+      />
+      <Tabs.Screen
+        name="ai-feed"
+        options={{
+          title: "AI Feed",
+          tabBarIcon: ({ color }) => <Globe2 color={color} size={24} />,
         }}
       />
     </Tabs>
