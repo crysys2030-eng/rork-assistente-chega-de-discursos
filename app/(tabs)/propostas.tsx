@@ -337,23 +337,7 @@ Linguagem formal em Português de Portugal adequada ao contexto parlamentar.`;
           </View>
         ) : (
           <View style={styles.proposalsList}>
-            {proposals && [...proposals]
-              .sort((a, b) => {
-                try {
-                  const dateA =
-                    a.createdAt instanceof Date
-                      ? a.createdAt
-                      : new Date(a.createdAt);
-                  const dateB =
-                    b.createdAt instanceof Date
-                      ? b.createdAt
-                      : new Date(b.createdAt);
-                  return dateB.getTime() - dateA.getTime();
-                } catch {
-                  return 0;
-                }
-              })
-              .map((proposal) => (
+            {(proposals || []).map((proposal) => (
                 <LinearGradient
                   key={proposal.id}
                   colors={["#0f3460", "#16213e"]}
@@ -529,7 +513,8 @@ Linguagem formal em Português de Portugal adequada ao contexto parlamentar.`;
                     </View>
                   )}
                 </LinearGradient>
-              ))}
+              )
+            )}
           </View>
         )}
       </ScrollView>
