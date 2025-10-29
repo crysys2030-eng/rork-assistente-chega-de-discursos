@@ -1,5 +1,5 @@
 import { Tabs } from "expo-router";
-import { Calendar, FileText, ListChecks, Globe2 } from "lucide-react-native";
+import { Calendar, FileText, ListChecks, MessageCircle, TrendingUp, Scale } from "lucide-react-native";
 import React from "react";
 
 export default function TabLayout() {
@@ -23,32 +23,45 @@ export default function TabLayout() {
       }}
     >
       <Tabs.Screen
+        name="chega-tasks"
+        options={{
+          title: "Tarefas",
+          tabBarIcon: ({ color }) => <ListChecks color={color} size={20} />,
+        }}
+      />
+      <Tabs.Screen
+        name="propostas"
+        options={{
+          title: "Propostas",
+          tabBarIcon: ({ color }) => <Scale color={color} size={20} />,
+        }}
+      />
+      <Tabs.Screen
         name="index"
         options={{
           title: "Agenda",
-          tabBarIcon: ({ color }) => <Calendar color={color} size={22} />,
+          tabBarIcon: ({ color }) => <Calendar color={color} size={20} />,
         }}
       />
-
       <Tabs.Screen
         name="minutes"
         options={{
           title: "Minutas",
-          tabBarIcon: ({ color }) => <FileText color={color} size={22} />,
+          tabBarIcon: ({ color }) => <FileText color={color} size={20} />,
         }}
       />
       <Tabs.Screen
-        name="chega-tasks"
+        name="respostas"
         options={{
-          title: "Tarefas",
-          tabBarIcon: ({ color }) => <ListChecks color={color} size={22} />,
+          title: "Media",
+          tabBarIcon: ({ color }) => <MessageCircle color={color} size={20} />,
         }}
       />
       <Tabs.Screen
-        name="ai-feed"
+        name="analise"
         options={{
-          title: "Feed",
-          tabBarIcon: ({ color }) => <Globe2 color={color} size={22} />,
+          title: "Opinião",
+          tabBarIcon: ({ color }) => <TrendingUp color={color} size={20} />,
         }}
       />
     </Tabs>
