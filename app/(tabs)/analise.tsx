@@ -13,7 +13,6 @@ import {
   ThumbsDown,
   Minus,
   BarChart3,
-  MessageSquare,
 } from "lucide-react-native";
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
@@ -370,7 +369,7 @@ A análise deve ser:
                         <Text style={styles.sectionTitle}>
                           🔑 Pontos-Chave
                         </Text>
-                        {analysis.keyPoints.map((point, i) => (
+                        {(analysis.keyPoints || []).map((point, i) => (
                           <View key={i} style={styles.listItem}>
                             <Text style={styles.bullet}>•</Text>
                             <Text style={styles.listText}>{point}</Text>
@@ -382,7 +381,7 @@ A análise deve ser:
                         <Text style={styles.sectionTitle}>
                           💡 Recomendações
                         </Text>
-                        {analysis.recommendations.map((rec, i) => (
+                        {(analysis.recommendations || []).map((rec, i) => (
                           <View key={i} style={styles.listItem}>
                             <Text style={styles.bullet}>•</Text>
                             <Text style={styles.listText}>{rec}</Text>
@@ -392,7 +391,7 @@ A análise deve ser:
 
                       <View style={styles.section}>
                         <Text style={styles.sectionTitle}>📢 Fontes</Text>
-                        {analysis.sources.map((source, i) => (
+                        {(analysis.sources || []).map((source, i) => (
                           <View key={i} style={styles.listItem}>
                             <Text style={styles.bullet}>•</Text>
                             <Text style={styles.listText}>{source}</Text>

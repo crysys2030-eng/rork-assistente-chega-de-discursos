@@ -330,7 +330,7 @@ Inclui:
                         <Text style={styles.sectionTitle}>
                           🎯 Mensagens-Chave
                         </Text>
-                        {response.keyMessages.map((msg, i) => (
+                        {(response.keyMessages || []).map((msg, i) => (
                           <View key={i} style={styles.listItem}>
                             <Text style={styles.bullet}>•</Text>
                             <Text style={styles.listText}>{msg}</Text>
@@ -342,7 +342,7 @@ Inclui:
                         <Text style={styles.sectionTitle}>
                           🔄 Alternativas
                         </Text>
-                        {response.alternatives.map((alt, i) => (
+                        {(response.alternatives || []).map((alt, i) => (
                           <View key={i} style={styles.altBox}>
                             <Text style={styles.altNumber}>{i + 1}</Text>
                             <Text style={styles.altText}>{alt}</Text>
@@ -350,10 +350,10 @@ Inclui:
                         ))}
                       </View>
 
-                      {response.warnings.length > 0 && (
+                      {response.warnings && response.warnings.length > 0 && (
                         <View style={styles.section}>
                           <Text style={styles.sectionTitle}>⚠️ Avisos</Text>
-                          {response.warnings.map((warn, i) => (
+                          {(response.warnings || []).map((warn, i) => (
                             <View key={i} style={styles.warningBox}>
                               <Text style={styles.warningText}>{warn}</Text>
                             </View>

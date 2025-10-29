@@ -403,7 +403,7 @@ Linguagem formal em Português de Portugal adequada ao contexto parlamentar.`;
                         <Text style={styles.sectionTitle}>
                           📌 Pontos Principais
                         </Text>
-                        {proposal.mainPoints.map((point, i) => (
+                        {(proposal.mainPoints || []).map((point, i) => (
                           <View key={i} style={styles.listItem}>
                             <Text style={styles.bullet}>{i + 1}.</Text>
                             <Text style={styles.listText}>{point}</Text>
@@ -413,7 +413,7 @@ Linguagem formal em Português de Portugal adequada ao contexto parlamentar.`;
 
                       <View style={styles.section}>
                         <Text style={styles.sectionTitle}>⚖️ Base Legal</Text>
-                        {proposal.legalBasis.map((basis, i) => (
+                        {(proposal.legalBasis || []).map((basis, i) => (
                           <View key={i} style={styles.legalItem}>
                             <Text style={styles.legalText}>{basis}</Text>
                           </View>
@@ -440,7 +440,7 @@ Linguagem formal em Português de Portugal adequada ao contexto parlamentar.`;
                         <Text style={styles.sectionTitle}>
                           👥 Partes Interessadas
                         </Text>
-                        {proposal.stakeholders.map((stakeholder, i) => (
+                        {(proposal.stakeholders || []).map((stakeholder, i) => (
                           <View key={i} style={styles.listItem}>
                             <Text style={styles.bullet}>•</Text>
                             <Text style={styles.listText}>{stakeholder}</Text>
