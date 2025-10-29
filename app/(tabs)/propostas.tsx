@@ -327,7 +327,7 @@ Linguagem formal em Português de Portugal adequada ao contexto parlamentar.`;
       </View>
 
       <ScrollView style={styles.scrollView}>
-        {proposals.length === 0 ? (
+        {!proposals || proposals.length === 0 ? (
           <View style={styles.emptyState}>
             <Scale size={64} color="#C7C7CC" />
             <Text style={styles.emptyTitle}>Nenhuma proposta criada</Text>
